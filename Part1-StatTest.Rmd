@@ -1,0 +1,42 @@
+---
+title: "Statistical Testing"
+author: "Rajarshi Guha"
+date: "January 5, 2015"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+---
+
+As you might expect R provides extensive support for statistical testing. In this section we'll focus on a few examples, though we won't go into the details of the underlying theory.
+
+# Hypothesis testing
+
+## Testing for normality
+
+## Testing for differences in means
+
+## Testing for enrichment
+
+# Adjusting p-values
+
+# Analysis of variance
+
+Are there differences in potency between pairs of targets? We consider cmpds with good curve classes and annotated with a target.
+```{r}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+good <- subset(dat, CCLASS2 %in% c(-1.1, -1.2, -2.1) & !is.na(target))
+model <- aov(LAC50 ~ target, good)
+summary(model)
+```
+
+The summary of the ANOVA indicates that that target has a statistically significant effect on the potency. Next we're interested in seeing whether there are differences in potency between targets. We can do this using a post-hoc test
+```{r}
+posthoc <- TukeyHSD(model)
+posthoc <- data.frame(posthoc$target)
+subset(posthoc, p.adj < 0.01) # only need the significant cases
+```
+
+A more complex analysis that would look at the effect of target and dose of a sensitizer (and interactions between these two factors) could be done using a factorial ANOVA.
