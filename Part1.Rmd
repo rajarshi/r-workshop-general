@@ -1,0 +1,545 @@
+---
+title: "An Introduction to R"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+---
+
+```{r echo=FALSE}
+set.seed(12345)
+```
+
+An Introduction to R
+=====================
+
+This document provides a basic introduction to the R environment focusing on the use of [RStudio](http://www.rstudio.com/) as the interface to R. We'll be working on a server that hosts RStudio so that you don't need to install anything right now. However, you're free to run RStudio on your own machine, though you will need to manually install a few packages.
+
+This document is based largely on two pre-existing tutorials by [Kelly Black](http://www.cyclismo.org/tutorial/R/) and [William King](http://ww2.coastal.edu/kingw/statistics/R-tutorials/)
+
+In the remainder of this document, code in grey boxes can be copied and pasted into an R console.
+
+# Useful resources
+
+There's a plethora of useful resources for every level of R user on the Internet as well as in book form. A useful reference card for general R can be obtained from [here](http://www.stats.bris.ac.uk/R/doc/contrib/refcard.pdf). Given the large number of tutorials available on the web, consider choosing one from the following to sets of annotated collections
+
+* [R tutorials and courses](http://scs.math.yorku.ca/index.php/R:_R_tutorials_and_courses)
+* [Topic specific tutorials](http://ww2.coastal.edu/kingw/statistics/R-tutorials/)
+
+If you'd rather not have to decide which tutorial is best for you, consider the following
+
+* [Novice level](http://students.washington.edu/cggreen/uwstat/rprimer/) (online book)
+* A more extensive [tutorial](http://cran.r-project.org/doc/contrib/Robinson-icebreaker.pdf) that covers some more advanced topics in linear and multi-level models
+
+Apart from these, consider [StatMethods](http://www.statmethods.net/) which is a very handy reference for specific functions and tasks. [R by Example](http://www.mayin.org/ajayshah/KB/R/index.html) is also useful, though tends towards examples from finance and economics.
+
+
+# Working in the R environment
+
+## Getting help
+
+At the console prompt type
+```{r eval=FALSE}
+help('lm')
+```
+to view the help page for the `lm` method. Alternatively, you can type
+```{r eval=FALSE}
+?lm
+```
+to get the same help page. In general these are useful when you know what function you're looking for. When you don't you can try using `help.search` passing in the term you want to look up. For example, say you want to compute the median, 
+```{r eval=FALSE}
+help.search('median')
+```
+will list all functions that are related to the median. In some cases this can be overwhelming. As a last resort, consider using Google or ask the local R expert.
+
+Once you know the function you're looking for and have read the man page you can get  a live view of how it works by doing
+```{r eval=FALSE}
+example('median')
+```
+
+## Scripting
+
+While the console is good for quick and dirty calculations (usually a single line or maybe two), it's more useful to write your code in a file (also called a script) and save that. First it ensures that you have a record of what you did. Second it lets you rerun the code at one go and (hopefully) reproduce your results. Third, you can share the code with other R users.
+
+If you've written your code in a file called `myscript.R` you can then run it by typing in the console
+```{r eval=FALSE}
+source('myscript.R')
+```
+
+## Saving your work
+
+By default, whenever you exit RStudio, it will save your work for you. You can do it manually by typing
+```{r eval=FALSE}
+save.image(file='allmywork.Rda')
+```
+(changing the filename to something you like) which will save the complete state of your workspace (which includes data and functions) to the file `allmywork.Rda`. Then, when you restart R, you can type
+```{r eval=FALSE}
+load('allmywork.Rda')
+```
+and you should be restored to the state you were in when you saved it. Importantly, this lets you *share* your workspace with other users. Of course, depending on the size of your datasets, it may not be a good idea to send the file via email!
+
+Alternatively, if you just want to save a few things rather than everything in your workspace (which might include scratch data or temporary variables) you can do something like
+```{r eval=FALSE}
+save(obj1, obj2, file='somedata.Rda')
+```
+which saves the variables called `obj1` and `obj2` to the file `somedata.Rda`. You can then load these into your environment at a later time by using the `load()` command. In general this is the most useful way to share (processed) data between R users.
+
+## Keeping track of your workspace
+
+If you're using RStudio it's easy to see what variables and functions are available in your workspace. If not, you can use the `ls()` command to get a list of the objects in your workspace
+```{r}
+ls()
+```
+You can view the value of an object by simply typing its name at the console. If you want to remove an object use the `rm()` command as 
+```{r eval=FALSE}
+rm(name_of_object)
+```
+
+Usually it's useful to know something about your current working directory. To see all the files in your current directory (aka folder) use the `dir()` command
+```{r}
+dir() # You'll probably see a different result
+```
+You can view the current directory using `getwd()`
+```{r}
+getwd() # You'll probably see a different result
+```
+You can also chnage your working directory using `setwd()` (or via `Session->Set Working Directory->Choose Directory` in the RStudio menu)
+
+# R Data Types
+
+## Numeric
+
+All numbers, integer or decimal have a class of `numeric` and a default type of `double`. It is possible to force a number to be considered an integer but you usually don't need to bother about the distinction in the beginning.
+
+The most basic way to store a number is to make an assignment of a single number:
+```{r}
+a <- 3
+```
+The “<-” tells R to take the number to the right of the symbol and store it in a variable whose name is given on the left. You can also use the “=” symbol. When you make an assignment R does not print out any information. If you want to see what value a variable has just type the name of the variable on a line and press the enter key:
+```{r}
+a
+```
+This allows you to do all sorts of basic operations and save the numbers:
+```{r}
+b <- sqrt(a*a+3)
+b
+```
+
+You can create a collection (also called a “vector”) using the `c` command:
+```{r}
+a <- c(1,2,3,4,5)
+a
+```
+Individual values of the vector can be accessed using an index (which starts from 1)
+```{r}
+a[1]
+a[2]
+a[0] # 0 is not a valid index, so you get nothing
+a[6] # 6 is not a valid index, but now you get NA (undefined)
+```
+Vectors can be used for all R data types
+
+## Character
+
+You are not limited to just storing numbers. You can also store strings (called "character" in the R world). A string is specified by using quotes. Both single and double quotes will work
+```{r}
+a <- "hello"
+a
+```
+As with numbers you can create character vectors
+```{r}
+b <- c('hello', "world")
+b
+b[1]
+```
+
+## Factor
+
+In many experiments the outcome is one of a set of categories - active/inactive or soluble/partially soluble/insoluble or even ranges such as age ranges (0-5, 5-10, and so on). R represents this type of data using `factor`s. For a given factor variable, the individual categories are termed `levels`. Though a factor looks like a character variable, it is represented differently and behaves differently, especially in computations (it doesn't make sense to compute the mean of a factor!)
+
+A factor variable can be created from a character variable
+```{r}
+f <- factor(c('active', 'inactive', 'active', 'active'))
+f
+```
+A common operation on factors is a tabulation of the levels - basically a frequency table. Given a single factor, the `table` function returns a 1-way table, i.e., frequencies of each level. 
+```{r}
+table(f)
+```
+We can generate a 2-way table by providing two factors of equal length. For example, for a set of 5 molecules, we have the activity status (`active` or `inactive`) and their solubility status (`soluble` or `insoluble`). What is the count of `active` that are `soluble`?
+```{r}
+a <- factor(c('active', 'active', 'inactive', 'inactive', 'inactive'))
+b <- factor(c('soluble', 'insoluble', 'insoluble', 'insoluble', 'soluble'))
+table(a,b)
+```
+(Note that `table` works equally well when provided a character variable)
+
+A useful visualization of a tabulation is a [mosaicplot](http://en.wikipedia.org/wiki/Mosaic_plot). For the above tabulation we'd get
+```{r}
+mosaicplot(table(a,b))
+```
+
+## Logical
+
+There are two predefined variables, TRUE and FALSE
+```{r}
+a <- TRUE
+a
+b <- FALSE
+b
+```
+The standard logical operators are available but it's important to note that logical operations on vectors can be handled in two ways
+```{r}
+a <- c(TRUE, TRUE, FALSE)
+b <- c(TRUE, FALSE, FALSE)
+a || b # or
+a | b  # entry-wise or
+```
+
+## Testing the type of a variable
+
+For every class (`numeric`, `character`, `logical`, `factor`) of variable there is a function to test whether a given variable belongs to that class
+```{r}
+a <- 'hello'
+is.numeric(a)
+is.character(a)
+is.logical(a)
+is.factor(a)
+```
+
+## NA vs NULL
+
+A useful notion is that of missing data - a measurement was made, but for some reason we don't know what it is. This is represented by `NA`, which is a logical value. However the result of any logical operations on `NA` gives back an `NA`
+```{r}
+NA > 1
+NA == 2
+```
+`NULL` can also be considered as a way to represent missing data. But more correctly, it represents undefined data. Usually, `NULL` is returned by functions and expressions when the value is undefined. `NULL` is a special object. `NA` and `NULL` are treated differently - e.g., vectors cannot store `NULL` and will remove them silently
+```{r}
+a <- c(1, NA, NULL)
+a
+```
+You can test whether a variable is `NA` or `NULL` using `is.na` or `is.null` respectively.
+
+# R Data Structures
+
+So far we've seen the data types supported in R. But generally, we're going to work with collections of data - activity data for compounds with NCGC ID's and common names, along with curve class assignments. We'll briefly consider the four main data structures in R: vector, list, matrices and data.frames. For a detailed discussion of data structures see [here](http://adv-r.had.co.nz/Data-structures.html)
+
+## Vector
+
+A vector is created using the `c` command and is intended to hold data of a *single type* - all numeric, or all character and so on. If you mix types, the result is coerced to a common type
+```{r}
+c(1, 'a', TRUE)
+```
+Here the only way to represent all three with the same type is to coerce them to `character`. But this is probably not what you want!
+
+On the other hand
+```{r}
+c(1, TRUE)
+```
+results in a numeric vector because `TRUE` is represented internally as 1 (and `FALSE` as 0).
+
+If the elements of a vector are contiguous, you can use a short form (for numeric vectors)
+```{r}
+a <- 1:10
+a
+```
+
+Yet another way to get a sequence of numbers, possibly with a fixed interval is to the `seq` function
+```{r}
+seq(1, 10, by=2)
+```
+
+Given a vector, many R operations will work on individual elements of the vector
+```{r}
+c(1,2,3) + 1
+```
+and 
+```{r}
+c(1,2,3) + c(4,5,6)
+```
+
+An important aspect of vectors is *recycling*. If in an operation using two vectors, one is shorter than the other, the shorter one is padded to the same length as the longer one, by repeating the values as required (along with a warning if the shorter vector cannot be fully recycled):
+```{r}
+c(1,2) + c(4,5,6)
+```
+is equivalent to 
+```{r}
+c(1,2,1) + c(4,5,6) # c(1,2) was 'recycled' to make a vector of length 3
+```
+Similarly, 
+```{r}
+c(1,2) + c(4,5,6,7,8,9)
+```
+is equivalent to 
+```{r}
+c(1,2,1,2,1,2) + c(4,5,6,7,8,9)
+```
+
+Finally, you can get the number of elements in a vector using the `length()` function.
+
+## List
+
+A list is a lot like a vector, but can hold different types of objects. In fact a list can contain any type of R object. In addition, lists can have a name for each element. Lists are created using `list`
+```{r}
+a <- list(1, "Hello", c(1,2,3,4))
+a
+```
+Individual elements of a list can be accessed via their index (starting from 1), but using '[[ ]]' rather than '[ ]'
+```{r}
+a[[3]]
+```
+If you instead did `a[3]` you'd get a list with a single element, which is the second element of the original list. This can trip you up, if you were expecting a vector of 4 element
+```{r}
+a[[3]][2] # 2nd element of the vector c(1,2,3,4)
+a[3][2] # gives NULL since a[3] is a 1-element list
+a[3][[1]][2] ## works
+```
+A useful thing about lists is that the elements can be named and then accessed by their name
+```{r}
+x <- list(a=1, b=2, c="Hello", d=c(1,2,3,4,5))
+x$c
+x[["d"]]
+```
+Accessing list elements using a 'name index' (rather than a numeric index) can be very useful when processing lists programmatically. Note that names can be added after the fact
+```{r}
+names(a) <- c('First', 'Second', 'Third')
+a
+```
+
+## Matrices
+
+A matrix is a 2D data structure, all of whose elements must be of the same type (just like vectors). If you mix things up, the data gets coerced as described for vectors. To construct a matrix we use `matrix` and provide a vector representing the element and specify the number of rows (or columns or both). Importantly, the matrix is constructed "down the columns" (though this can be changed to "along the rows")
+```{r}
+elems <- 1:16
+matrix(elems, nrow=4) # down the columns
+matrix(elems, nrow=4, byrow=TRUE) # along the rows
+```
+As with vectors, arithmetic operations operate on an element-wise basis
+```{r}
+m <- matrix(1:9, nrow=3)
+m+1
+m * matrix(1:9, nrow=3)
+```
+In contrast to vectors, matrices don't get recycled if the dimensions don't match. A matrix is a special case of an `array`. This data structure is essentially an n-dimensional matrix (so that a matrix is just a 2D array). 
+
+Elements of a matrix can be indexed using `[i,j]` notation (where i and j must start from 1). You can get the dimensions of the matrix using `dim`, the number of rows using `nrow(m)` and number of columns using `ncol`
+
+## Data frames
+
+A `data.frame` is the tabular equivalent of a list, in that it is 2D like a matrix, but each column can be of a different type. This data structure is the workhorse of data manipulation and analysis in R and you should get comfortable with it. We construct one using the `data.frame()` command
+```{r}
+d <- data.frame(Col1=c(1,2,3), Col2=c('a', 'b', 'c'), 
+                Col3=c(TRUE, TRUE, FALSE), 
+                Col4=factor(c('active', 'inactive', 'inactive')))
+d
+```
+The elements of a `data.frame` can be indexed just like a matrix. In addition you can access an entire column of a `data.frame` using the column name just like a list
+```{r collapse=TRUE}
+d[2,3]
+d$Col2
+d[["Col2"]] # This works because a data.frame is actually a collection of lists
+```
+When reading in data from a CSV or a database the return value is usually a `data.frame`. For large datasets it's useful to get a summary. Use the `str` command (or if you're in RStudio look in the *Environment* panel)
+```{r}
+str(d)
+```
+Given a `data.frame` we can add a new column by simply assigning something to the new columns name. If we assign fewer values than there are rows in the `data.frame` the values get recycled.
+```{r}
+d$newCol <- d$Col1 * 10
+d$anotherCol <- 'A single value'
+d
+```
+# Reading in data
+
+The most common method to read in data is from a CSV or tab-delimited file. The relevant functions are `read.csv` and `read.table`. Importantly, the file can be on your local hard drive or located at some URL. As an example, we'll play with a MIPE4 qHTS screen. First we read in the data and then take a look at the contents of the `data.frame`
+```{r results='hide'}
+dat <- read.csv('/ncats/prod/rworkshop/mipe4-qhts.csv',
+                header=TRUE, # because the file has a header
+                as.is=TRUE, # if FALSE all character variables are converted to factors
+                comment='') # because SMILES can have '#' in them
+str(dat)
+```
+If you have tab-delimited data use the `read.table` function and specify `delim='\t'` as an extra argument.
+
+# Basic Operations
+
+We've already seen some basic arithmetic operations on vectors. In general most operations work on an element-wise basis for vectors and matrices. There are some functions that are useful for getting information about variables an d summaries of data.
+
+Given a `data.frame` or list you can get the names of columns or elements, respectively using the `names()` function
+```{r}
+names(dat)
+```
+The `summary()` method is a useful way to get a summary of numerical and factor variables. When applied to a `data.frame` or matrix you get a summary of each column.
+```{r}
+summary(dat)
+```
+Summaries of character variables are not very informative. However, in our qHTS data, we can convert some character variables to factors - curve class and target are good candidates
+```{r results='hide'}
+dat$CCLASS2 <- as.factor(dat$CCLASS2)
+dat$target <- as.factor(dat$target)
+summary(dat)
+```
+Other common operations include `mean`, `median`, `sd` (standard deviation), `min`, `max` and so on. `quantile` is a useful function to summarize distributions
+```{r}
+quantile(dat$LAC50, na.rm=TRUE)
+```
+Here the `na.rm=TRUE` argument is required since the LAC50 field contains `NA` (for the case where there was no curve fit). When `na.rm=TRUE` is specified, the function will ignore those values. Otherwise the default is `na.rm=FALSE` and the result will be NA. This argument is accepted by many functions - check the man pages.
+
+## Subsetting
+
+Given a large dataset, working on subsets is a common operation. This is especially useful when computing summaries on different subsets. Given a `data.frame` we can extract a subset of the rows using logical operations on the columns by using the `subset()` function.
+
+For example, lets consider the subset of compounds that had a curve class of -1.1:
+```{r}
+good.actives <- subset(dat, CCLASS2 == -1.1)
+nrow(good.actives)
+```
+We can use more complex subsetting rules - for example we can use a combination of curve class and efficacy (the absolute difference between `ZERO` and `INF`):
+```{r}
+efficacious.actives <- subset(dat, (CCLASS2 == -1.1 | CCLASS2 == -1.2) & abs(ZERO-INF) > 90)
+nrow(efficacious.actives)
+```
+Importantly, note the use of `|` and `&` since we're comparing vectors element-wise. A common mistake is to use `||` or `&&` which will lead to wrong results
+
+# Indexing
+
+We've already seen how to access elements of a vector, list, matrix and `data.frame`. However, there are ways to access multiple elements using index values, but also using logical values. First consider indexing using position - either using a single position or a vector of positions
+```{r collapse=TRUE}
+a <- c(1,2,3,4,5,6,7,8,9,10)
+a[1]
+a[1:3] # Elements 1, 2 and 3
+a[c(1,5,8)] # Elements 1, 5 and 8
+a[-c(1,5,8)] # Elements except 1, 5 and 8
+```
+It's also possible to use a logical vector, of the same length as the vector you're indexing. In this method, if the i'th element of the index vector is `TRUE` then the i'th element of the vector being indexed is returned
+```{r collapse=TRUE}
+idx <- c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE)
+a[idx]
+```
+Since logical operations work element-wise we can compute logical expressions and use the result to index the vector. For example, select elements that are greater than 8
+```{r}
+idx <- a > 8
+a[idx]
+```
+Or to get a little more complicated, get the elements that are greater than the mean value of the vector
+```{r}
+idx <- a > mean(a)
+a[idx]
+```
+The same principles apply to matrices and `data.frames` - except that you can specify two indices:
+```{r collapse=TRUE}
+m <- matrix(1:16, nrow=4)
+m[c(1,3), ] # rows 1 and 3 and all columns
+m[c(1,3), c(3,4)] # rows 1 and 3 and columns 3 and 4
+m[c(1,3), -c(3,4)] # rows 1 and 3 and all columns except 3 and 4
+```
+For the case of a `data.frame` we can use the same methods as above, but in addition, also use column names.
+```{r collapse=TRUE}
+dat[1:5, c(5,6,7)]
+dat[1:5, c('CCLASS2', 'LAC50', 'HILL')]
+```
+Finally, a useful function is `which` - this identifies the indices of a vector that satisfy a logical expression. The indices can then be used to extract the element of the vector.
+```{r collapse=TRUE}
+a <- 1:10
+which(a > 8)
+a[ which(a > 8) ]
+a[ a > 8 ] # Same as above
+```
+
+# Basic plotting
+
+For now we'll look at some plotting functions that are always available in an R installation. A simple scatter plot can be generated using `plot` and providing either two vectors or a matrix with two columns
+```{r}
+a <- runif(50) # 50 samples from the uniform distribution
+b <- rnorm(50) # 50 samples from a normal distribution with mean = 0 and sd = 1
+plot(a, b)
+```
+
+While `summary` gives you a description of the distribution of a vector, `hist` will generate the corresponding graphical histogram
+```{r}
+a <- rnorm(100)
+hist(a)
+```
+
+Note that a histogram is basically a barchart. You can create a barchart by using the `barplot` function. The input is a vector of values which will correspond to the heights of the bars.
+```{r}
+a <- c(2,5,10,3,8)
+barplot(a)
+```
+
+The `barplot` function is useful for visualizing frequency tables. Consider a variable whose elements are a random sample of 3 values: `active`, `inactive` and `inconclusive`. We can construct this variable using the `sample` function:
+```{r}
+a <- sample( c('active', 'inactive', 'inconclusive'), 50, replace=TRUE)
+ta <- table(a)
+barplot(ta)
+```
+
+Finally we consider [box and whisker](http://en.wikipedia.org/wiki/Box_plot) plots which provide a visual summary of the distribution of a variable, usually conditioned on two or more categories. In its simplest form you can provide a single numeric vector
+```{r}
+a <- rnorm(100)
+boxplot(a)
+```
+
+However, it becomes more useful when we are interested in looking at the distribution of a variable across different categories. Using our MIPE4 dataset, lets look at the distribution of LAC50 in the "good" curve classes
+```{r fig.width=10}
+# %in% return a vector whose i'th element is TRUE if the i'th element 
+# in CCLASS2 is present in the vector on the RHS
+good <- subset(dat, CCLASS2 %in% c(-1.1, -1.2, -2.1, -2.2)) 
+boxplot( LAC50 ~ CCLASS2, good)
+```
+You'll see that the plot includes x-axis positions for all curve class values - this is because we previously converted the `CCLASS2` variable to a factor. Even though we considered a subset of the `data.frame` the `CCLASS2` variable in the subset will have the same levels as in the original `data.frame` - except that only 3 of the levels will be populated. 
+
+We can get a prettier boxplot by specifying the levels of the `CCLASS2` factor
+```{r fig.width=10}
+# unique returns the unique values of a variable
+good$CCLASS2 <- factor(good$CCLASS2, levels=c("-1.1", "-1.2", "-2.1")) 
+boxplot( LAC50 ~ CCLASS2, good)
+```
+
+# Simple modelling
+
+As a first look at modeling in R, we'll build a simple regression model to predict solubility. This employs a dataset of more than 57K compounds (Pubchem [AID 1996](https://pubchem.ncbi.nlm.nih.gov/assay/assay.cgi?aid=1996&loc=ea_ras)) and has been described by [Guha et al](http://www.sciencedirect.com/science/article/pii/S0968089611003506). The pre-processed data can be loaded via an Rda file. In addition to the solubility values, the `data.frame` includes two classifications of the continuous solubility measurements as well as the Pubchem SID for each molecule and a set of numerical descriptors of the chemical structures. In there interests of time, we'll work with a random subset of the data (say 10%), rather than all 57K compounds
+
+```{r}
+load('/ncats/prod/rworkshop/aid1996.Rda')
+sdesc <- desc[ sample(1:nrow(desc), 0.10*nrow(desc)), ]
+nrow(sdesc)
+
+# Some summary stats
+summary(sdesc$sol)
+summary(sdesc$label)
+```
+
+As always pictures are worth many words
+
+```{r}
+hist(sdesc$sol)
+boxplot(sol ~ label, sdesc)
+```
+The data is clearly bimodal, so that a single model may not be a great idea. However, for now we'll ignore the finer details and just consider the mechanics of model building. First we consider an ordinary least squares model where we try to predict the numerical solubility using a few of the calculated descriptors. As you can see from the data.frame there are 188 descriptors - which ones do we use? To answer this rigorously we would have to apply some form of [feature selection](http://en.wikipedia.org/wiki/Feature_selection). Or use a method (such as [random forest](http://en.wikipedia.org/wiki/Random_forest)) that does not require explicit feature selection.
+
+For now, we'll just select some features by hand. To build the model we use the `lm` function
+```{r}
+model <- lm(sol ~ a_aro + rings + BCUT_PEOE_0, sdesc)
+summary(model)
+plot(sdesc$sol, fitted(model))
+```
+
+The model summary (as well as the plot) shows very poor predictive performance. This is not surprising since the solubility values are not normally distributed at all. This can be shown using a Q-Q plot
+```{r}
+qqnorm(sdesc$sol)
+qqline(sdesc$sol)
+```
+
+Can we do any better if we predict solubility classes? We first try a linear approach using `lda`
+```{r}
+library(MASS)
+cmodel <- lda(label ~ a_aro + rings + BCUT_PEOE_0, sdesc)
+preds <- predict(cmodel, sdesc)$class
+table(sdesc$label, preds)
+mosaicplot(table(sdesc$label, preds))
+```
+
+Not a whole lot! There are a number of reasons - first, we arbitrarily selected descriptors to use. This is not a good idea in general unless you have specific knowledge of the biology or chemistry. Second, this is an unbalanced classification problem - as a result, most observations are predicted to be in the majority class (`medium` solubility).
