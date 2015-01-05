@@ -1,0 +1,171 @@
+---
+title: "(Very Basic) R Programming"
+author: "Rajarshi Guha"
+date: "January 5, 2015"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+
+---
+
+# Why program in R
+
+For many tasks you can use R just like SPSS or Stata - and it will likely be a bit inconvenient compared to those packages. For example you could read in CSV's files of qHTS data for two screens corresponding to two treatments and perform a t-test to see if there is a statistically significant difference in potency. 
+
+Even slicing and dicing data (such as subsetting or transforming columns) can usually be performed in a few easy steps. However, in many cases, you need to perform repetitive operations - say perform some calculation on multiple datasets or combine a series of operations into a 'workflow' and so on.
+
+For these scenarios, being able to construct loops and write functions will save you a lot of time and lead to elegant (and in many cases) more efficient code.
+
+# Functions in R
+
+This is a very brief intro to writing R functions - I'll be glossing over many details. See [here](http://nicercode.github.io/guides/functions/) for a more detailed introduction and [here](http://adv-r.had.co.nz/Functions.html) for a more advanced description of functions.
+
+A function consists of 4  things
+
+* The function name (which can be any valid R variable name)
+* The function arguments (what it will accept - which could be nothing)
+* The body of the function (the actual stuff that the function will do)
+* The return value of the function
+
+Consider a simple function that takes in a single argument and returns that argument plus 2
+```{r}
+f1 <- function(x) {
+  return(x+2)
+}
+```
+
+From the description (or by reading the code) its safe to assume that you send a *number* into the function. But there's nothing stopping you from sending in a string - if you do it'l fail.  
+```{r collapse=TRUE, error=TRUE}
+f1(2)
+f1("Hello")
+```
+
+This is a good thing and a bad thing in R - without reading the documentation it's not obvious what type of data goes in to a function. But at the same time this allows you to write a function that can take any data type and deal with it appropriately.
+
+Importantly, if the code inside a function is written appropriately, you can send in different data structures. Since addition works element-wise on a vector we can send in a single number or a vector of numbers. But lists don't support element-wise operations.
+```{r collapse=TRUE, error=TRUE}
+f1(c(1,2,3,4))
+f1(list(1,2,3,4))
+```
+
+R functions can have arguments that have a default value. Lets change the above function so that we can specify what number to add to `x`
+```{r collapse=TRUE}
+f2 <- function(x, what.to.add = 2) {
+  return(x + what.to.add)
+}
+f2(2) # Will use the default value of what.to.add
+f2(2, 5)
+f2(2, what.to.add = 5)
+```
+
+In these examples we've returned a single value. In many cases it can be useful to return multiple values (e.g., after fitting a dose response curve you want to return the 4 fit parameters). In this cases, use a list with named elements as the return value
+```{r collapse=TRUE, error=TRUE}
+f3 <- function(x, a) {
+  r <- list(value=x+a, addend=a)
+  return(r)
+}
+f3(2) # fails because a has no default value
+f3(2, 10)
+```
+
+## Variable scope
+
+When it comes to determining the value of a variable there is a path that R will use to search for its value. In the case of functions if a previously undefined variable appears R will look at the argument list for the function. Next it will look in the current work space. If you are not careful R will find the value some place where you do not expect it, and your function will return a value that is not correct, and no error will be given. **Be very careful about the names of variables especially when using functions.**
+
+## Everything is a function
+
+While `1+2` doesn't look like a function, the `+` operator is actually implemented as a function, so that you can write `"+"(1,2)` and it will return `r "+"(1,2)`. For now this is a curiosity but it does allow you to redefine any function (so `+` could be redefined to mean `-` - not a great idea!)
+
+# Loops in R
+
+The for loop in R works by operating over a sequence (which could be a vector or a list) of values
+```{r}
+for (i in c(1,2,3,4)) {
+  print(i)
+}
+for (j in list(1,2,3,4)) {
+  print(j+2)
+}
+```
+
+As a simple example, given a vector we want to obtain the vector squared, element-wise
+```{r}
+v <- c(1,2,3,4)
+sv <- numeric(length(v))
+for (i in v) {
+  i^2 # but how do we save the squared value?
+}
+for (i in 1:length(v)) {
+  sv[i] <- v[i]^2
+}
+sv
+```
+
+## `apply` and friends
+
+When using `for` loops, saving the result of each iteration usually involves either preparing a vector (or other data structure) to contain that result, or else keep track of a index variable ourselves. R provides a few other functions that return the result of operating on a vector or list as another vector or list or matrix. These functions include `apply`, `sapply`, `lapply`, `mapply`, and `tapply`. See this [Stackoverflow answer](http://stackoverflow.com/a/7141669) for a nice description of these functions. A quick summary:
+
+* `lapply` is an apply which returns a list (acts on any vector or list and returns a list)
+* `sapply` is a simple lapply (function defaults to returning a vector or matrix when possible)
+* `rapply` is a recursive apply (for nested lists, i.e. lists within lists)
+* `tapply` is a tagged apply (the tags identify the subsets)
+* `apply` is generic: (applies a function to a matrix's rows or columns)
+
+(These functions represent what is called [functional programming](http://en.wikipedia.org/wiki/Functional_programming). If you've never worked in this approach, an R-specific [introduction](http://www.bioinformaticszen.com/post/simple-functional-programming-in-r/) is useful.)
+
+The `sapply` method operates on a vector or list and applies a function (provided by the user) to each element of the vector and returns these result of the function as another vector.
+```{r}
+v <- 1:10
+sapply(v, function(x) x^2)
+```
+
+(Here we've used what is called an *anonymous function* - it has no name and is only used in the context of the `sapply` function. You'll see that it doesn't show up in your *Environment* panel)
+
+When you provide the function to `sapply` you have to ensure that it accepts the appropriate data type. If it's written to accept numbers, then the above code will fail if `v` is a character vector.
+
+The `apply` function is useful when operating on entire rows or columns of a matrix. Say we want the mean response (across all compounds) at each dose of a qHTS experiment. 
+```{r}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+resps <- dat[, 12:22]
+apply(resps, 2, mean)
+```
+
+Here the second argument, `2` indicates that the function (`mean`) will receive each column of the data.frame in turn. Importantly, the function passed to `apply` must support a single vector as input (since a row or a column of the matrix is a vector). Whether this is a numeric vector or a character vector is problem dependent - but you need to anticipate what type of data will be sent to the function. If we specified `1` instead, then `mean` would receive each *row* of the matrix (so you'd get the mean response across all doses, for each compound)
+```{r}
+mean.resp.by.cmpd <- apply(resps, 1, mean)
+length(mean.resp.by.cmpd)
+```
+
+While the function that is applied must accept the vector as input, it can have other arguments. These can have default values; but if not, you must specify the value of the argument when calling `apply` (and this applies to all the apply family of functions)
+```{r collapse=TRUE}
+resps[1,1] <- NA
+apply(resps, 2, mean) # we should ignore NA's
+apply(resps, 2, mean, na.rm=TRUE)
+```
+
+### Iterating over subsets
+
+While these functions iterate over every element (or along a dimension), a common task is to operate on subsets of the data. For example, what is the median AUC and median potency for each curve class in a qHTS experiment? `by` comes to the rescue
+```{r}
+r <- by(dat, dat$CCLASS2, function(x) c(median(x$auc), median(x$LAC50)))
+r
+do.call(rbind, as.list(r))
+```
+
+In this example, `by` iterates over subsets of `dat` where each subset corresponds to a unique value of `CCLASS2` and passes the subset (which is a `data.frame`) to the anonymous function. Since this function receives a `data.frame` we can operate on specific columns. The return value in this case is a special object of class `by` - we can convert this to a list using `as.list` and then transform the list to a matrix.
+
+However, `tapply` can provide a useful, simpler alternative if you want to summarize a single variable across combinations of groups. For example, what is the mean potency conditioned on curve class?
+```{r}
+tapply(dat$LAC50, dat$CCLASS2, mean)
+```
+
+The nice thing about `tapply` is that you get a simple R data type (array or matrix) rather than a special object that requires extra handling. We could also get a curve class *and* target-wise summary:
+```{r}
+m <- tapply(dat$LAC50, list(dat$CCLASS2, dat$target), mean, na.rm=TRUE)
+m[1:10, 1:5] # it's a big matrix, so we just show a part of it
+```
+
+So, if you want to operate on entire subsets of a `data.frame` consider using `by`. But if you want to operate on a single variable of a `data.frame` subsetted by one or more other variables, consider `tapply`.
