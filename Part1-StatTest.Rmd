@@ -42,7 +42,7 @@ shapiro.test(normal.values)
 
 There are other tests for normality ([Kolmogorov Smirnov](http://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test), [Anderson-Darling](http://en.wikipedia.org/wiki/Anderson%E2%80%93Darling_test), [Cramer von Mises](http://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93von_Mises_criterion), etc.). You can usually find the corresponding R functions via a Google search or consider the [nortest](http://cran.r-project.org/web/packages/nortest/nortest.pdf) package for a one stop shop. Also see [Ghasemi and Zahediasi](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3693611/) for a more scholarly description.
 
-However, [normality tests don’t do what you think they do](http://www.r-bloggers.com/normality-tests-don%E2%80%99t-do-what-you-think-they-do/)
+However, [normality tests don’t do what you think they do](http://www.r-bloggers.com/normality-tests-don%E2%80%99t-do-what-you-think-they-do/) (remember that "fail to reject is not the same thing as accept"!)
 
 ## Testing for differences in means
 
