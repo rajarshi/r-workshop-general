@@ -15,19 +15,137 @@ As you might expect R provides extensive support for statistical testing. In thi
 
 ## Testing for normality
 
+Many hypothesis tests as well as modeling methods such as least squares regression assume that your data is normally distributed.  So it's a good idea to test this assumption before further calculations. Lets look at the potency values for the actives from a MIPE4 screen and use some visual methods to check for normality.
+```{r fig.width=10}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+actives <- subset(dat, CCLASS2 %in% c(-1.1, -1.2))
+potencies <- actives$LAC50
+
+par(mfrow=c(1,2))
+# Not very normal
+qqnorm(potencies)
+qqline(potencies)
+
+# Plot the density distrubution
+plot(density(potencies))
+```
+
+We can also use the [Shapiro Wilk](http://en.wikipedia.org/wiki/Shapiro%E2%80%93Wilk_test) test
+```{r}
+shapiro.test(potencies)
+
+# Just to be sure, what does the test say for really normal data?
+normal.values <- rnorm(100)
+shapiro.test(normal.values)
+```
+
+There are other tests for normality ([Kolmogorov Smirnov](http://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test), [Anderson-Darling](http://en.wikipedia.org/wiki/Anderson%E2%80%93Darling_test), [Cramer von Mises](http://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93von_Mises_criterion), etc.). You can usually find the corresponding R functions via a Google search or consider the [nortest](http://cran.r-project.org/web/packages/nortest/nortest.pdf) package for a one stop shop. Also see [Ghasemi and Zahediasi](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3693611/) for a more scholarly description.
+
+However, [normality tests don’t do what you think they do](http://www.r-bloggers.com/normality-tests-don%E2%80%99t-do-what-you-think-they-do/)
+
 ## Testing for differences in means
+
+The [t-test](http://en.wikipedia.org/wiki/Student%27s_t-test) is used in a variety of screening scenarios. A t-test can be used for 
+
+* A one-sample location test of whether the mean of a population has a value specified in a null hypothesis.
+* A two-sample location test of the null hypothesis such that the means of two populations are equal (assuming equal variances), also termed a "independent samples" t-test
+* A test of the null hypothesis that the difference between two responses measured on the same statistical unit has a mean value of zero, also termed a  "paired" or "repeated measures" t-test
+
+For example, given a MIPE screen run in two cell lines - a wild type and a mutant. We could ask
+
+* For a given compound, does its potency differ between the two lines, in a statistically significant manner?
+* Is there a difference in the potency of the actives between the two cell lines?
+
+The former can't really be tested for unless we have replicate data. The second can be addressed using the t-test (though if the data are not normal it's better to use the [Mann Whitney U (aka Wilcoxon rank-sum)](http://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test) test).  
+
+Another useful task is to see whether there is a difference in the potencies between the two cell lines, but on a target-wise basis. An approach to do this for MIPE screens is [available](http://carnot.ncats.nih.gov:3838/tdiff/)
 
 ## Testing for enrichment
 
-# Adjusting p-values
+In many cases it's useful to test whether certain items in a subset are overrepresented compared to the entire dataset. A more concrete example is to ask whether the any of the targets corresponding to the actives in a qHTS screen are overrepresented compared to the distribution of the targets in the entire MIPE collection. We can answer this question by using the [hypergeometric test](http://en.wikipedia.org/wiki/Hypergeometric_distribution) (a.k.a., [Fishers exact test](http://en.wikipedia.org/wiki/Fisher%27s_exact_test)).
 
-# Analysis of variance
+Here's a function to do this in the general cases, where you have a sample of symbols taken from the population of symbols
+```{r}
+enrichment <- function(moas, pop.moas, meth) {
+  umoas <- sort(unique(moas))
+  if (!all(umoas %in% unique(pop.moas))) 
+    stop("All symbols being tested must occur in the background population")
+  pvals <- sapply(umoas, function(amoa) {
+    sampleSize <- length(moas)
+    hitInSample <- length(which(moas == amoa))
+    hitInPop <- length(which(pop.moas == amoa))
+    failInPop <- length(pop.moas) - hitInPop
+    fisher.test(matrix(c(hitInSample-1,
+                         hitInPop-hitInSample,
+                         sampleSize-hitInSample,
+                         failInPop-sampleSize+hitInSample),2,2), alt='greater')$p.value
+  })
+  data.frame(moa=umoas, p=pvals, padj=p.adjust(pvals, meth))
+}
+```
+For example, lets say we have a population of symbols and a random sample of them
+```{r}
+pop <- c(rep('A', 70), rep('B', 30), rep('C', 40), rep('D', 40))
+sub <- c(rep('A', 20), rep('B', 15), rep('C', 5), rep('D', 3))
+enrichment(sub, pop, 'BH')
+```
 
-Are there differences in potency between pairs of targets? We consider cmpds with good curve classes and annotated with a target.
+This is a contrived example so lets go back and see what targets are enriched in the set of actives from a MIPE4 screen. As before we load in our data from the CSV and then identify a subset of actives. As our population (or background) we consider all non-`NA` MIPE4 targets
 ```{r}
 dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
                 header=TRUE,as.is=TRUE,comment='')
-good <- subset(dat, CCLASS2 %in% c(-1.1, -1.2, -2.1) & !is.na(target))
+actives <- subset(dat, CCLASS2 %in% c(-1.1, -1.2))
+actives.targets <- actives$target
+all.targets <- dat$target
+
+# we remove NA's
+actives.targets <- na.omit(actives.targets)
+all.targets <- na.omit(all.targets)
+
+enr <- enrichment(actives.targets, all.targets, 'BH')
+
+## order by adjusted p-value and select targets enriched at alpha = 0.05
+enr <- enr[order(enr$padj),]
+subset(enr, padj < 0.05)
+```
+
+### GO term enrichments
+Another common enrichment calculation involves the use of [GO](http://geneontology.org/) terms. For this type of analysis you wouldn't use the above function since the hierarchical nature of GO terms requires some adjustments. However, R provides a handy method for this analysis via the [GOstats](http://www.bioconductor.org/packages/release/bioc/html/GOstats.html) package. Rather than using gene symbols, we'll need Entrez Gene IDs, which we can also obtain using R
+```{r cache=TRUE, message=FALSE, warning=FALSE}
+library(GOstats)
+library(org.Hs.eg.db)
+
+# Some target symbols do not map to gene ids. Example is FGFR which actually should
+# be FGFR1 or FGFR2 or ...
+actives.geneid <- mget(actives.targets, envir=org.Hs.egSYMBOL2EG, ifnotfound=NA)
+uni.geneid <- mget(all.targets, envir=org.Hs.egSYMBOL2EG, ifnotfound=NA)
+params <- new("GOHyperGParams", 
+              geneIds = actives.geneid, 
+              universeGeneIds=uni.geneid, 
+              ontology = "BP",
+              pvalueCutoff = 0.05, conditional=F, 
+              testDirection = "over", annotation="org.Hs.eg.db")
+r <-  hyperGTest(params)
+gosum <- summary(r)
+gosum[1:10,]
+```
+
+# Adjusting p-values
+
+The outcome of most hypothesis tests are p-values. Leaving aside a discussion of the abuse of p-values, you should be aware of multiple hypothesis testing and the corresponding adjustment of the p-values. There are many ways to perform these adjustments - [Bonferroni](http://en.wikipedia.org/wiki/Bonferroni_correction), [Benjamini-Hochberg](http://en.wikipedia.org/wiki/False_discovery_rate), etc. 
+
+Given a set of p-values from a set of hypothesis tests, we can obtain the adjusted p-values using `p.adjust` and specifying the adjustment method. My personal preference is 'BH'. Note that the `p.adjust` function doesn't support Storey's [q value](http://genomics.princeton.edu/storeylab/qvalue/) method. For that consider using the [qvalue](http://www.bioconductor.org/packages/release/bioc/html/qvalue.html) package.
+
+# Analysis of variance
+
+Another way to look at differences in means is to perform an Analysis of Variance (ANOVA). While this may be overkill for a simple comparison of, say, potencies, between two conditions, it becomes very useful when considering multiple effects (say, effect of target or target and dose of sensitizer and so on). 
+
+Lets consider the MIPE4 screen and see whether the target of the compound has an effect on its potency. We consider compounds with good curve classes and annotated with a target. Our first questio is, *does the target have an effect on potency?*
+```{r}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+good <- subset(dat, CCLASS2 %in% c(-1.1, -1.2) & !is.na(target))
 model <- aov(LAC50 ~ target, good)
 summary(model)
 ```
@@ -36,7 +154,29 @@ The summary of the ANOVA indicates that that target has a statistically signific
 ```{r}
 posthoc <- TukeyHSD(model)
 posthoc <- data.frame(posthoc$target)
-subset(posthoc, p.adj < 0.01) # only need the significant cases
+subset(posthoc, p.adj < 0.05) # only need the significant cases
 ```
 
-A more complex analysis that would look at the effect of target and dose of a sensitizer (and interactions between these two factors) could be done using a factorial ANOVA.
+Interestingly, this suggests that potency differences between [TUBB](http://en.wikipedia.org/wiki/TUBB) and a few other targets are statistically significant. This may or may not be interesting!
+
+We can get more complex. Consider two MIPE screens - one run on a cell line with [CD47](http://en.wikipedia.org/wiki/CD47) and one with it KO'd. Does the KO status and/or the target affect the potency? Does the combination of KO and target affect the potency?
+```{r}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-4t1b.csv',
+                header=TRUE,as.is=TRUE,comment='')
+datws <- read.csv('/ncats/prod/common/R-Workshop/mipe4-4t1b+CD47.csv',
+                header=TRUE,as.is=TRUE,comment='')
+good <- subset(dat, CCLASS2 %in% c(-1.1, -1.2) & !is.na(target))
+goodws <- subset(datws, CCLASS2 %in% c(-1.1, -1.2) & !is.na(target))
+
+tmp <- rbind( data.frame(cond='4T1B', good[, c('LAC50', 'target')]),
+              data.frame(cond='4T1B+CD47', goodws[, c('LAC50', 'target')]))
+model <- aov(LAC50 ~ target * cond, tmp)
+summary(model)
+
+posthoc <- TukeyHSD(model)
+posthoc$cond
+posthoc.target <- data.frame(posthoc$target)
+subset(posthoc.target, p.adj < 0.01) # only need the significant cases
+```
+
+The analysis indicates that while target does affect potency, the potency is not affect by KO status (or by the interaction of KO status and target)
