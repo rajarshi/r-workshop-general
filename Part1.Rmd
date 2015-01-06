@@ -1,7 +1,7 @@
 ---
 title: "An Introduction to R"
 author: "Rajarshi Guha"
-date: "January 5, 2015"
+date: "January 13, 2015"
 output:
   html_document:
     toc: true
