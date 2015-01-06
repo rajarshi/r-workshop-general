@@ -279,7 +279,16 @@ is equivalent to
 c(1,2,1,2,1,2) + c(4,5,6,7,8,9)
 ```
 
+Two useful operation on vectors are to test whether each element satisfies some condition and do something based on that and find which element(s) satisfy some condition. While you could loop over each element and test it, the `ifelse` function and the `which` functions are very handy
+```
+v <- c(1,2,3,4,5,6,7)
+ifelse(v < 5, 'less than 5', 'greater than 5')
+which(v < 5)
+```
+The former is useful for recoding a vector from a numeric one to a factor or logical one. The latter is useful for indexing purposes.
+
 Finally, you can get the number of elements in a vector using the `length()` function.
+
 
 ## List
 
