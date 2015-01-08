@@ -1,0 +1,32 @@
+---
+title: "Statistical Testing"
+author: "Rajarshi Guha"
+date: "January 13, 2015"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+---
+
+Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how manage qHTS data - this may be TMI! More importantly, direct access to the database is deprecated and so may not be available in the future.
+
+As an example, lets examine plate summaries for a series of screens
+```{r}
+library(ROracle)
+library(ncgchts)
+library(ggplot2)
+library(reshape)
+
+con <- get.connection('hts', 'ncgc', 'probedb')
+proto.names <- c('s-vhl-UOK102-1',
+                 's-vhl-UOK109-1',
+                 's-vhl-UOK121-1',
+                 's-vhl-UOK121-2')
+
+protos <- lapply(proto.names, function(p) {
+  plates <- get.plates(con, p, type.index=0, layer.index=0)
+})
+
+aplate <- protos[[1]]
+```
