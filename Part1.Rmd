@@ -335,7 +335,9 @@ m * matrix(1:9, nrow=3)
 ```
 In contrast to vectors, matrices don't get recycled if the dimensions don't match. A matrix is a special case of an `array`. This data structure is essentially an n-dimensional matrix (so that a matrix is just a 2D array). 
 
-Elements of a matrix can be indexed using `[i,j]` notation (where i and j must start from 1). You can get the dimensions of the matrix using `dim`, the number of rows using `nrow(m)` and number of columns using `ncol`
+Elements of a matrix can be indexed using `[i,j]` notation (where i and j must start from 1). Interestingly you can also index a matrix using a single index (e.g., `m[i]`) - in this case R considers the matrix to be "unrolled"; in other words a vector formed by the columns one after each other. Then the index represents the position in this vector. This notation is useful when using the `which` function which gives you the indices of the elements that satisfy a logical constraint.
+
+You can get the dimensions of the matrix using `dim`, the number of rows using `nrow(m)` and number of columns using `ncol`
 
 ## Data frames
 

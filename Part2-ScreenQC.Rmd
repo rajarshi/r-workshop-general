@@ -9,9 +9,11 @@ output:
     number_sections: true
 ---
 
-Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how manage qHTS data - this may be TMI! Furthermore, the packages that support qHTS, matrix and RNAi database access are undocumented. More importantly, direct access to the database is deprecated and so may not be available in the future.
+Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages (`ncgchts`, `ncgcmatrix`, `ncgcrnai`) that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how we manage qHTS data - this may be TMI! Finally, the packages that support qHTS, matrix and RNAi database access are undocumented. More importantly, direct access to the database is deprecated and so may not be available in the future.
 
 If these functionality are of general interest, then we can consider converting to a form suitable for more general use within NCATS.
+
+# Plate level QC
 
 As an example, lets examine plate summaries for a series of screens
 ```{r message=FALSE, warning=FALSE}
@@ -104,4 +106,98 @@ ggplot(stacked, aes(x=pid, y=value, group=variable, colour=variable))+
     facet_wrap(~ proto, scales='free')
 ```
 
+# Curve level summaries
 
+We can also access curve data dircetly from R using the `query.protocol` function in the `ncgchts` package. This lets us perform curve level summaries very easily. This allows us to easily summarize a single qHTS screen or efficiently summarize multiple screens (e.g., compute a summary of selectivity versus promiscuity).
+
+## Single protocol summaries
+
+First lets pull in a single protocol and compute a few summaries
+```{r}
+cdata <- query.protocol(con, proto.names[1], 'activity')
+head(cdata)
+```
+As you can see we get a raw data dump, which should be sufficient to summarize the protocol. Obviously we can get more sophisticated by adding in target information and structures. For now, lets get numerical summaries of potency and MAXR, broken down by curve class, and counts of each curve class.
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+cdata %>%
+  group_by(CCLASS2) %>%
+  summarize(N=n(),
+            MedPotency=median(LAC50),
+            MedMAXR=median(MAXR)) %>%
+  arrange(desc(N))
+```
+
+We can also get a simpler summary by using the `CCLASS2` variable to make a categorization - *active*, *inactive*, *inconclusive*. Then we compute a summary similar to the above but across these three classes
+```{r}
+cdata$klass <-ifelse(cdata$CCLASS2 %in% c(-1.1, -1.2, -2.1, -2.2), 
+                      "active",
+                      ifelse(cdata$CCLASS2 == 4, 
+                             "inactive",
+                             "inconclusive"))
+cdata %>%
+  group_by(klass) %>%
+  summarize(N=n(),
+            MedPotency=median(LAC50, na.rm=TRUE),
+            MedMAXR=median(MAXR, na.rm=TRUE)) %>%
+  arrange(desc(N))
+```
+
+We can easily convert these data.frames to multi-panel plots (each column vs curve class or klass) by restructering them so that we get a stacked version
+```{r fig.width=10, message=FALSE, warning=FALSE}
+library(reshape2)
+
+csum <- cdata %>%
+  group_by(klass) %>%
+  summarize(N=n(),
+            MedPotency=median(LAC50, na.rm=TRUE),
+            MedMAXR=median(MAXR, na.rm=TRUE)) %>%
+  arrange(desc(N))
+
+csum <- melt(as.data.frame(csum), id.vars='klass')
+ggplot(csum, aes(x=klass, y=value))+
+  geom_bar(stat='identity', fill='beige', colour='black')+
+  facet_wrap(~variable, scale='free')
+```
+
+## Multi protocol summaries
+
+This isn't a whole lot different from summarizing a single protocol - you just loop over a list of data.frame's performing the same summarization. However, lets look at summarizing compound selectivity (or promiscuity) for a series of cell lines. First we pull in curve data for the 4 cell lines
+```{r}
+cdatas <- lapply(proto.names, function(p) {
+  r <- query.protocol(con, p, 'activity')
+  r$proto <- p
+  r <- r[order(r$SID),] # so that row i in each data.frame corresponds to the same NCGC ID
+  return(r)
+})
+```
+
+Now, for each protocol, we'll generate a logical vector that indicates whether a compound is active or not. 
+```{r}
+avecs <- lapply(cdatas, function(cdata) {
+  ifelse(cdata$CCLASS2 %in% c(-1.1, -1.2, -2.1), TRUE, FALSE)
+})
+avecs <- do.call(cbind, avecs)
+head(avecs)
+```
+
+So each row of `avecs` indicates whether that compound is active or inactive in each of the four protocols. Noting that R internally treats `TRUE` as 1 and `FALSE` as 0, we can sum a vector of logicals, the result of which is the number of `TRUE` values as shown below:
+```{r}
+l <-c(TRUE, TRUE, FALSE)
+sum(l)
+```
+
+So if we compute the row sums of `avecs` we'll end up with a vector that contains how many times a compound was active in the four protocols - this can range from 0 (inactive in all screens) to 4 (active in all screens).
+```{r}
+acounts <- rowSums(avecs)
+acounts[1:10]
+```
+
+Finally, we can then obtain the counts of each count (!) - i.e., how many compounds have 0, how many have 1 etc. Plotting these counts of counts gives us a simple visual summary of the selectivity vs promiscuity of the MIPE compounds in these protocols
+```{r}
+freqs <- data.frame(table(acounts))
+ggplot(freqs, aes(x=acounts, y=Freq))+
+  geom_bar(stat='identity', fill='beige', colour='black')+
+  xlab("Number of cell lines active in")+
+  ylab("Number of compounds")
+```
