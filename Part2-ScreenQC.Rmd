@@ -1,5 +1,5 @@
 ---
-title: "Statistical Testing"
+title: "Simple qHTS QC"
 author: "Rajarshi Guha"
 date: "January 13, 2015"
 output:
@@ -9,7 +9,9 @@ output:
     number_sections: true
 ---
 
-Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how manage qHTS data - this may be TMI! More importantly, direct access to the database is deprecated and so may not be available in the future.
+Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how manage qHTS data - this may be TMI! Furthermore, the packages that support qHTS, matrix and RNAi database access are undocumented. More importantly, direct access to the database is deprecated and so may not be available in the future.
+
+If these functionality are of general interest, then we can consider converting to a form suitable for more general use within NCATS.
 
 As an example, lets examine plate summaries for a series of screens
 ```{r message=FALSE, warning=FALSE}
@@ -31,7 +33,7 @@ protos <- lapply(proto.names, function(p) {
 
 So at this point we've got a list of plates for each of the four protocols. How many plates does each one have?
 ```{r}
-lapply(protos, length)
+sapply(protos, length)
 ```
 
 To work with a plate we'll need to know the layout. For that we can retrieve the plate map that was used when we loaded the data. In this case each protocol used the same plate map, so we just need to pull one
@@ -64,7 +66,7 @@ get.median.values <- function(m, pm) {
   neg.control.idx <- which(pm == 'n')
   neg.control <- median(m[neg.control.idx])
   
-  return(data.frame(pid=attr(m, "plate.id"), 
+  return(data.frame(pid=attr(m, "cmpd.plate.id"), 
                     media=media.only, 
                     pos=pos.control, 
                     neg=neg.control))
@@ -81,6 +83,25 @@ head(svals)
 
 ggplot(svals, aes(x=pid, y=value, group=variable, colour=variable))+
   geom_point(size=4)+geom_line()+
-  xlab("Assay Plate ID")+ylab("Median Well Value")+
+  xlab("Compound Plate ID")+ylab("Median Well Value")+
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ```
+
+You could generate one of these plots for each protocol we obtained. But we could also be a little more masochistic and get a *matrix* of plots at one go. 
+```{r fig.width=10, fig.height=8}
+all.vals <- lapply(protos, function(plates) {
+  r <- do.call(rbind, lapply(plates, get.median.values, pm))
+  r$proto <- attr(plates[[1]], 'protocol')
+  return(r)
+})
+all.vals <- do.call(rbind, all.vals)
+
+stacked <- melt(all.vals, id.vars=c('pid', 'proto'))
+ggplot(stacked, aes(x=pid, y=value, group=variable, colour=variable))+
+  geom_point(size=4)+geom_line()+
+    xlab("Compound Plate ID")+ylab("Median Well Value")+
+    theme(axis.text.x = element_text(angle=45, hjust=1))+
+    facet_wrap(~ proto, scales='free')
+```
+
+
