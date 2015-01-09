@@ -1,0 +1,118 @@
+---
+title: "Better Data Manipulation & Plotting"
+author: "Rajarshi Guha"
+date: "January 13, 2015"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+---
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.width=12, warning=FALSE, message=FALSE)
+```
+
+While base R provides all the methods you need to slice and dice your data, there are a number of downsides. One of the biggest sticking points is that related functions are not always consistent. For example, `lapply` takes the sequence, followed by the function to apply. The same for `sapply` and `tapply`. But `mapply`, takes the function first, followed by two sequences.
+
+# Reshaping your data
+
+The natural way to think about a dataset is have the observations in the rows and features or characteristics in the columsn. This makes for easy viewing, but is not always computationally efficient. In fact, from an analysis point of view, a "stacked" form is easier to process. 
+
+Given a traditional table as shown below, 
+```{r echo=FALSE,results='asis'}
+d <- data.frame(Sample=c('Aspirin', 'Bortezomib', 'Sunitinib'),
+                MW=c(180,384,398),
+                LogP=c(1.2, 2.0, 2.6),
+                TPSA=c(63.6, 124, 77.2))
+kable(d)
+```
+
+The stacked version would look like
+```{r echo=FALSE}
+library(reshape2)
+kable(melt(d, id.vars='Sample'))
+```
+
+The key thing is that the observations can now be easily conditioned on one or more features. This makes life much easier when we want to plot multiple features (a.k.a., facetting) and is the required data structure when dealing with [`ggplot`](http://ggplot2.org/)
+
+We can perform such transformations using the `reshaep2` package and the `melt` function
+```{r}
+d <- data.frame(Sample=c('Aspirin', 'Bortezomib', 'Sunitinib'),
+                MW=c(180,384,398),
+                LogP=c(1.2, 2.0, 2.6),
+                TPSA=c(63.6, 124, 77.2))
+
+library(reshape2)
+melt(d, id.vars='Sample')
+```
+
+Things become more interesting when we wish to transform data where we have wish to consider some columns as independent variables, but multiple columns as dependent variables. Consider
+```{r}
+d <- data.frame(Sample=rep(LETTERS[1:3],2),
+                Condition=rep(c('WT','MU') ,3),
+                Read1=runif(6),
+                Read2=rnorm(6))
+d
+```
+In this case, we want to stack Read1 and Read2 for each combination of Sample and Condition
+```{r}
+melt(d, id.vars=c('Sample', 'Condition'))
+```
+
+This stacked version is not very legible. But it makes life **much** easier when go to plot the data
+
+
+## Merging tables
+
+A common task is to merge data.frames. If you'e familiar with SQL, this is the same thing as joining two tables on a common column. As an example consider two data.frames shown below. We'd like to merge them so we get one data.frame  that contains the location *and* age of each person
+```{r}
+ages <- data.frame(name=c('Foo', 'Bar', 'Baz', 'Boo'), age=c(20, 30, 40, 50))
+locs <- data.frame(name=c('Foo', 'Bar', 'Baz', 'Moo'), loc=c('CT', 'NY', 'MD', 'KS'))
+
+merge(ages, locs, by.x='name', by.y='name')
+```
+Importantly, the column to be matched need not be named the same (hence `by.x` and `by.y`). By default, the resultant data.frame only considers the common values in the matching colums.
+
+The `merge` function also allows you to include all rows of either or both columns (equivalent to left, right or complete joins in SQL).
+```{r}
+merge(ages, locs, by.x='name', by.y='name', all.x=TRUE)
+merge(ages, locs, by.x='name', by.y='name', all.y=TRUE)
+merge(ages, locs, by.x='name', by.y='name', all=TRUE)
+```
+
+Be careful with `all=TRUE` on large data.frames! As a concrete example, lets consider our qHTS dataset and identify active curves and then annotate it with sample info
+```{r}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+actives <- subset(dat, CCLASS2 %in% c(-1.1)) # only the very good actives
+
+actives <- actives[, c('SID', 'LAC50', 'MAXR', 'TAUC')]
+head(actives)
+
+load('/ncats/prod/common/R-Workshop/sample.info.Rda')
+
+anno <- merge(actives, sample.info, by.x='SID', by.y='SAMPLE_ID')
+anno <- subset(anno, select=-c(ALIAS, NCGC_ID))
+head(anno)
+
+# How many compounds have no targets?
+length(which(is.na(anno$GENE_SYMBOL)))
+```
+
+But one of the problems on matching sample ID's is that the same compound can have a different batch number. Even worse is that a compound may hve two totally different identifiers. Ignoring the latter problem for now, how can we match only on the NCGC ID (i.e., ignore the batch number). If you look at `sample.info` you'll see a column called "NCGC_ID" that lists the id's without batch numbers. So, to match on `NCGC_ID` we need to remove the batch number. We can do this using the `ncgchts` package 
+```{r}
+library(ncgchts)
+actives$NCGC_ID <- base.id(actives$SID)
+
+anno <- merge(actives, sample.info, by.x='NCGC_ID', by.y='NCGC_ID')
+anno <- subset(anno, select=-c(ALIAS, NCGC_ID))
+head(anno)
+
+# why do we do this?
+anno <- anno[!duplicated(anno$SID),]
+```
+
+# `dplyr` and pipelines
+
+# Flexible plotting using `ggplot`

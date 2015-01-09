@@ -8,6 +8,10 @@ output:
     theme: readable
     number_sections: true
 ---
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.width=12, warning=FALSE, message=FALSE)
+```
 
 Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages (`ncgchts`, `ncgcmatrix`, `ncgcrnai`) that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how we manage qHTS data - this may be TMI! Finally, the packages that support qHTS, matrix and RNAi database access are undocumented. More importantly, direct access to the database is deprecated and so may not be available in the future.
 
@@ -16,11 +20,11 @@ If these functionality are of general interest, then we can consider converting 
 # Plate level QC
 
 As an example, lets examine plate summaries for a series of screens
-```{r message=FALSE, warning=FALSE}
+```{r}
 library(ROracle)
 library(ncgchts)
 library(ggplot2)
-library(reshape)
+library(reshape2)
 
 con <- get.connection('hts', 'ncgc', 'probedb')
 proto.names <- c('s-vhl-UOK102-1',
@@ -45,7 +49,7 @@ pm[1:10, 1:10]
 ```
 
 Now we're in a position to start analysing the plates. First, lets quickly plot the plates using the `image` function
-```{r collapse=TRUE, fig.width=10}
+```{r}
 flip <- function(m) t(m[nrow(m):1, ])
 
 plates <- protos[[1]]
@@ -74,6 +78,7 @@ get.median.values <- function(m, pm) {
                     neg=neg.control))
 }
 
+pm <- get.plate.map(con, proto.names[1])
 vals <- do.call(rbind, lapply(protos[[1]], get.median.values, pm))
 vals
 ```
@@ -118,7 +123,7 @@ cdata <- query.protocol(con, proto.names[1], 'activity')
 head(cdata)
 ```
 As you can see we get a raw data dump, which should be sufficient to summarize the protocol. Obviously we can get more sophisticated by adding in target information and structures. For now, lets get numerical summaries of potency and MAXR, broken down by curve class, and counts of each curve class.
-```{r message=FALSE, warning=FALSE}
+```{r}
 library(dplyr)
 cdata %>%
   group_by(CCLASS2) %>%
@@ -144,7 +149,7 @@ cdata %>%
 ```
 
 We can easily convert these data.frames to multi-panel plots (each column vs curve class or klass) by restructering them so that we get a stacked version
-```{r fig.width=10, message=FALSE, warning=FALSE}
+```{r fig.width=10}
 library(reshape2)
 
 csum <- cdata %>%
@@ -201,3 +206,32 @@ ggplot(freqs, aes(x=acounts, y=Freq))+
   xlab("Number of cell lines active in")+
   ylab("Number of compounds")
 ```
+
+Having summarized the selectivity, how do get the actual compounds that are say pan-active? We have the vector of counts, so we identify which of the elements are 4. The indices of these elements can be used to index one of the data.frame's that holds the curve data to obtain the NCGC ID's.
+```{r}
+pan.active.idx <- which(acounts == 4)
+pan.active <- cdatas[[1]][pan.active.idx,]
+pan.active.sid <- pan.active$SID
+```
+
+We could then ask, what is the median potency, MAXR and AUC of the pan actives in each of the four cell lines? 
+```{r}
+pansum <- lapply(cdatas, function(cdata) {
+    s <- subset(cdata, SID %in% pan.active.sid) %>%
+      group_by(proto) %>%
+      summarize(medPotency = median(LAC50),
+                medMAXR = median(MAXR),
+                medAUC = median(FAUC))
+    return(s)
+})
+pansum <- do.call(rbind, pansum)
+pansum
+
+melt(as.data.frame(pansum), id.vars='proto') %>%
+  ggplot(aes(x=proto, y=value))+
+  geom_bar(stat='identity', fill='beige', colour='black')+
+  facet_wrap(~variable, scale='free')+
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+**CAVEAT** Much of these analyses depend on the fact that a compound has the same NCGC ID (including batch) number across all protocols. If batches change (or worse, if the NCGC ID changes) you can get inaccurate or even wrong results.
