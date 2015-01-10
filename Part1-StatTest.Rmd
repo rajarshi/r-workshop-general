@@ -183,7 +183,7 @@ The analysis indicates that while target does affect potency, the potency is not
 
 # Power of a test
 
-Power analysis of a test allows us to answer a number of questions - how big a sample do we need to achieve a certain degree of confidence? Or, what is the probability of detecting a given effect given the current sample size and specified degree of confidence. [StatMethods](http://www.statmethods.net/stats/power.html) has a good summary of how to do power analysis in R. The workhorse package is `pwr` which provides methods to perform power analysis for t-test's, ANOVA, correlations etc.
+Power analysis of a test allows us to answer a number of questions - how big a sample do we need to achieve a certain degree of confidence? Or, what is the probability of detecting a given effect given the current sample size and specified degree of confidence. [StatMethods](http://www.statmethods.net/stats/power.html) has a good summary of how to do power analysis in R. Also see [Kelly Blacks' discussion](http://www.cyclismo.org/tutorial/R/power.html) on manually computing the power of a test. The workhorse package is `pwr` which provides methods to perform power analysis for t-test's, ANOVA, correlations etc.
 
 There are four things that can be calculated
 
@@ -192,6 +192,6 @@ There are four things that can be calculated
 * significance level (a.k.a., P(Type I error), a.k.a., probability of finding an effect that is not there)
 * power (a.k.a., 1 - P(Type II error), a.k.a, probability of finding an effect that is there)
 
-The biggest challenge is usually in defining the effect size - see [this discussion](http://www.ats.ucla.edu/stat/mult_pkg/faq/general/effect_size_power/effect_size_power.htm) or a more [exhaustive discussion](http://en.wikipedia.org/wiki/Effect_size)
+The biggest challenge is usually in defining the effect size - see [this discussion](http://www.ats.ucla.edu/stat/mult_pkg/faq/general/effect_size_power/effect_size_power.htm) or a more [exhaustive discussion](http://en.wikipedia.org/wiki/Effect_size).
 
 
