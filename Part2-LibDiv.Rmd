@@ -1,0 +1,18 @@
+---
+title: "Chemical Space & Library Diversity"
+author: "Rajarshi Guha"
+date: "January 13, 2015"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+---
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.width=10, warning=FALSE, message=FALSE)
+```
+
+# Visualizing the chemical space of a library
+
+# Comparing libraries of compounds
