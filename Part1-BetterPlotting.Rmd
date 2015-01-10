@@ -1,0 +1,206 @@
+---
+title: "Better Data Manipulation & Plotting"
+author: "Rajarshi Guha"
+date: "January 13, 2015"
+output:
+  html_document:
+    toc: true
+    theme: readable
+    number_sections: true
+---
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.width=10, warning=FALSE, message=FALSE)
+```
+
+# Reshaping your data
+
+The natural way to think about a dataset is have the observations in the rows and features or characteristics in the columsn. This makes for easy viewing, but is not always computationally efficient. In fact, from an analysis point of view, a "stacked" form is easier to process. 
+
+Given a traditional table as shown below, 
+```{r echo=FALSE,results='asis'}
+d <- data.frame(Sample=c('Aspirin', 'Bortezomib', 'Sunitinib'),
+                MW=c(180,384,398),
+                LogP=c(1.2, 2.0, 2.6),
+                TPSA=c(63.6, 124, 77.2))
+kable(d)
+```
+
+The stacked version would look like
+```{r echo=FALSE}
+library(reshape2)
+kable(melt(d, id.vars='Sample'))
+```
+
+The key thing is that the observations can now be easily conditioned on one or more features. This makes life much easier when we want to plot multiple features (a.k.a., facetting) and is the required data structure when dealing with [`ggplot`](http://ggplot2.org/)
+
+We can perform such transformations using the `reshape2` package and the `melt` function
+```{r}
+d <- data.frame(Sample=c('Aspirin', 'Bortezomib', 'Sunitinib'),
+                MW=c(180,384,398),
+                LogP=c(1.2, 2.0, 2.6),
+                TPSA=c(63.6, 124, 77.2))
+
+library(reshape2)
+melt(d, id.vars='Sample')
+```
+
+Things become more interesting when we wish to transform data where we have wish to consider some columns as independent variables, but multiple columns as dependent variables. Consider
+```{r}
+d <- data.frame(Sample=rep(LETTERS[1:3],2),
+                Condition=rep(c('WT','MU') ,3),
+                Read1=runif(6),
+                Read2=rnorm(6))
+d
+```
+In this case, we want to stack Read1 and Read2 for each combination of Sample and Condition
+```{r}
+melt(d, id.vars=c('Sample', 'Condition'))
+```
+
+This stacked version is not very legible. But it makes life **much** easier when go to plot the data
+
+
+## Merging tables
+
+A common task is to merge data.frames. If you'e familiar with SQL, this is the same thing as joining two tables on a common column. As an example consider two data.frames shown below. We'd like to merge them so we get one data.frame  that contains the location *and* age of each person
+```{r}
+ages <- data.frame(name=c('Foo', 'Bar', 'Baz', 'Boo'), age=c(20, 30, 40, 50))
+locs <- data.frame(name=c('Foo', 'Bar', 'Baz', 'Moo'), loc=c('CT', 'NY', 'MD', 'KS'))
+
+merge(ages, locs, by.x='name', by.y='name')
+```
+Importantly, the column to be matched need not be named the same (hence `by.x` and `by.y`). By default, the resultant data.frame only considers the common values in the matching colums.
+
+The `merge` function also allows you to include all rows of either or both columns (equivalent to left, right or complete joins in SQL).
+```{r}
+merge(ages, locs, by.x='name', by.y='name', all.x=TRUE)
+merge(ages, locs, by.x='name', by.y='name', all.y=TRUE)
+merge(ages, locs, by.x='name', by.y='name', all=TRUE)
+```
+
+Be careful with `all=TRUE` on large data.frames! As a concrete example, lets consider our qHTS dataset and identify active curves and then annotate it with sample info
+```{r}
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+actives <- subset(dat, CCLASS2 %in% c(-1.1)) # only the very good actives
+
+actives <- actives[, c('SID', 'LAC50', 'MAXR', 'TAUC')]
+head(actives)
+
+load('/ncats/prod/common/R-Workshop/sample.info.Rda')
+
+anno <- merge(actives, sample.info, by.x='SID', by.y='SAMPLE_ID')
+anno <- subset(anno, select=-c(ALIAS, NCGC_ID))
+head(anno)
+
+# How many compounds have no targets?
+length(which(is.na(anno$GENE_SYMBOL)))
+```
+
+But one of the problems on matching sample ID's is that the same compound can have a different batch number. Even worse is that a compound may hve two totally different identifiers. Ignoring the latter problem for now, how can we match only on the NCGC ID (i.e., ignore the batch number). If you look at `sample.info` you'll see a column called "NCGC_ID" that lists the id's without batch numbers. So, to match on `NCGC_ID` we need to remove the batch number. We can do this using the `ncgchts` package 
+```{r}
+library(ncgchts)
+actives$NCGC_ID <- base.id(actives$SID)
+
+anno <- merge(actives, sample.info, by.x='NCGC_ID', by.y='NCGC_ID')
+anno <- subset(anno, select=-c(ALIAS, NCGC_ID))
+head(anno)
+
+# why do we do this?
+anno <- anno[!duplicated(anno$SID),]
+```
+
+# `dplyr` and pipelines
+
+We've already seen how to slice and dice data. Common operations include
+
+* Subsetting rows and columns
+* Adding new columns to a data frame
+* Performing operations on subsets
+
+Usually these involve creating new variables or making complex one line expressions.  The advantage of these methods is that they are built into R and you don't have to install new packages. 
+
+However the `dplyr` package is worth considering as it provide a few functions that read much like plain English and introduces the `%>%` operator, which if you're familiar with Unix is equivalent to the `|` (i.e., pipe) operator. See this [introduction](http://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html) for ways to use the `dplyr` package.
+
+Lets consider an example where we take a MIPE4 run, filter out class 4 compounds and then compute median potency and median MAXR for the compounds, grouped by curve class and finally order by the number of compounds in a given curve class:
+```{r}
+library(dplyr)
+dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
+                header=TRUE,as.is=TRUE,comment='')
+
+dat %>%
+  filter(CCLASS2 != 4) %>%               # same as subset
+  group_by(CCLASS2) %>%                  # same as by  
+  summarize(N=n(),
+            medPotency = median(LAC50),
+            medMAXR = median(MAXR)) %>%
+  arrange(desc(N))                      # same as order
+```
+
+It's definitely easier to read and even if you don't know R it's not too hard to understand what's going on. In addition the `%>%` operator avoids having to create intermediate variables, leading to cleaner code.
+
+The usual way is a little more code to write and not as seamless as using `dplyr`. 
+```{r}
+sdat <- subset(dat, CCLASS2 != 4)
+bdat <- by(sdat, sdat$CCLASS2, function(x) {
+  r <- data.frame(CCLASS2=x$CCLASS2[1],
+                  N=nrow(x),
+                  medPotency = median(x$LAC50),
+                  medMAXR = median(x$MAXR))
+  return(r)
+})
+bdat <- do.call(rbind, as.list(bdat))
+bdat[order(bdat$N, decreasing=TRUE),]
+```
+
+
+## Consistent alternatives to apply & friends
+
+While base R provides all the methods you need to slice and dice your data, there are a number of downsides. One of the biggest sticking points is that related functions are not always consistent. For example, `lapply` takes the sequence, followed by the function to apply. The same for `sapply` and `tapply`. But `mapply`, takes the function first, followed by two sequences.
+
+An alternative are the "XYply" family of functions provided by the [`plyr`](http://cran.r-project.org/web/packages/plyr/index.html) package. See this nice [tutorial](http://seananderson.ca/2013/12/01/plyr.html) for more details.
+
+In brief, `plyr` builds on top of `lapply` and related functions, but provides a systematic interface - the first and second letter of each of the functions indicates the data structure that goes in to the function the data structure that is returned from the function
+
+* `llply` takes a list, operates on each element and returns a list
+* `dlply` takes a `data.frame`, operates on each chunk (a.k.a., subset) and returns a list
+* `ldply` takes a list, operates on each element and returns a `data.frame`
+
+**Note** `dply` is like `plyr` but focuses only on `data.frame`s and replaces functions such as `ddply` with more intuitive verb names as we saw above.
+
+# Flexible plotting using `ggplot`
+
+[`ggplot`](http://ggplot2.org/) is an implementation of the [Grammar of Graphics](http://www.amazon.com/The-Grammar-Graphics-Statistics-Computing/dp/0387245448) which is a modular approach to constructing graphics. Using `ggplot` we can construct complex graphics by adding "layers" - a data layer, a shape layer and so on. The plots can be reused and modified by adding components. It takes some more effort than the base plotting packages, but the results are prettier and (with a bit of tweaking) publication quality.
+
+We won't have time to go into `ggplot` in depth, so consider the following resources.
+
+* [Reference](http://docs.ggplot2.org/current/) to the package and its functions
+* A [simple tutorial](http://www.noamross.net/blog/2012/10/5/ggplot-introduction.html) to get you
+started 
+* Another [introduction to ggplot](http://blog.echen.me/2012/01/17/quick-introduction-to-ggplot2/)
+* A more [extensive tutorial](http://www.ling.upenn.edu/~joseff/avml2012/) (but slightly out of date)
+
+As a very brief introduction lets look at an example of using `ggplot` to summarize some qHTS activity data. Lets construct a scatter plot of potency versus AUC (ignoring class 4 compounds).
+```{r}
+d <- dat %>% filter(CCLASS2 != 4)
+
+ggplot(d, aes(x=LAC50, y=TAUC))+
+  geom_point()
+```
+
+This plot has a data layer (the `ggplot(d, ...)` portion) and a geometry layer (the `geom_point()` portion). We can also add a statistics layer - in this case, we add a smoothed line (which uses [loess](http://en.wikipedia.org/wiki/Local_regression) by default)
+```{r}
+ggplot(d, aes(x=LAC50, y=TAUC))+
+  geom_point()+
+  stat_smooth()
+```
+
+What about looking at the relationship between potency and AUC, but within individual inhibitory curve classes
+```{r}
+d <- dat %>% filter(CCLASS2 < 0)
+ggplot(d, aes(x=LAC50, y=TAUC))+
+  geom_point()+
+  stat_smooth()+
+  facet_wrap(~CCLASS2, scale='free')
+```
