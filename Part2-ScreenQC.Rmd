@@ -10,7 +10,7 @@ output:
 ---
 ```{r global_options, include=FALSE}
 library(knitr)
-opts_chunk$set(fig.width=12, warning=FALSE, message=FALSE)
+opts_chunk$set(fig.width=10, warning=FALSE, message=FALSE)
 ```
 
 Since qHTS data is loaded in to the database, we can access plate and curve data directly from R. However, this requires installation of some packages (`ncgchts`, `ncgcmatrix`, `ncgcrnai`) that depend on Oracle - for Windows users getting this working is non-trivial. In addition, it requires you to know some of the internal details of how we manage qHTS data - this may be TMI! Finally, the packages that support qHTS, matrix and RNAi database access are undocumented. More importantly, direct access to the database is deprecated and so may not be available in the future.
