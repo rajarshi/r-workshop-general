@@ -1,5 +1,5 @@
 ---
-title: "Cross assay analyses"
+title: "Cross Assay Analyses"
 author: "Rajarshi Guha"
 date: "January 13, 2015"
 output:
