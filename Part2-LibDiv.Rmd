@@ -9,10 +9,120 @@ output:
     number_sections: true
 ---
 ```{r global_options, include=FALSE}
+set.seed(123456)
 library(knitr)
 opts_chunk$set(fig.width=10, warning=FALSE, message=FALSE)
 ```
 
+# Constructing a chemical space
+
+There are many ways to construct a chemical space which are all based on how we represent chemical structures. An obvious way is to describe compound by a set of physicochemical descriptors, say, MW, LogP and TPSA. Then, each compound is a point in this 3D space. Now, one could use more descriptors (which may be abstract and not necessarily an obvious physical feature) but then such a space cannot be easily visualized. In such a case we can employ a [multi-dimensional scaling](http://en.wikipedia.org/wiki/Multidimensional_scaling) method such as [Sammon mapping](http://en.wikipedia.org/wiki/Sammon_mapping), [PCA](http://en.wikipedia.org/wiki/Principal_component_analysis) or some other approach.
+
+First, let's read in a set of molecules and then construct a a few chemical spaces. To read in chemical structures, we'll use methods from `rcdk`.
+```{r}
+library(rcdk)
+
+mipe <- load.molecules('/ncats/prod/common/R-Workshop/mipe.smi')
+np <- load.molecules('/ncats/prod/common/R-Workshop/np.smi')
+dn <- 'org.openscience.cdk.qsar.descriptors.molecular.BCUTDescriptor'
+mipe.desc <- eval.desc(mipe, dn)
+np.desc <- eval.desc(np, dn)
+
+combo <- rbind(data.frame(set='mipe', mipe.desc),
+               data.frame(set='np', np.desc))
+```
 # Visualizing the chemical space of a library
 
+Depending on the dimensionality of the chemical space there are many ways. If we're looking at a single dimension we can compare histograms (or densities)
+```{r }
+d <- rbind(data.frame(set='mipe', tpsa=sapply(mipe, get.tpsa)),
+           data.frame(set='np', tpsa=sapply(np, get.tpsa)))
+ggplot(d, aes(x=tpsa, fill=set))+
+  geom_density(alpha=0.25)
+```
+
+But lets consider the 7D BCUT space. Obviously we can't plot it directly. So instead we perform a PCA and then plot the first two PC's. Before doing so we remove any molecules that led to undefined descriptor values
+```{r}
+combo.clean <- na.omit(combo)
+bcut.pca <- prcomp(combo.clean[,-1], scale=TRUE, center=TRUE)
+summary(bcut.pca)
+screeplot(bcut.pca)
+plot(bcut.pca$x[,1:2])
+```
+As you can see from the summary of the PCA (as well as the screeplot), the first two PC's on;y explain 49% of the total variation. As a result the 2D plot doesn't capture a whole lot.
+
+We could consider alternative dimension reduction techniques. An example is `isoMDS`, which requires us to provide a distance matrix, computed usiong the `dist` function. However, this algorithm fails if distances between objects are zero. Hence we identify elements of the distance matrix that are zero and set them to a small value.
+```{r}
+library(MASS)
+dat <- scale(combo.clean[,-1], scale=TRUE, center=TRUE)
+dm <- as.matrix(dist(dat))
+dm[dm==0] <- 1e-6 
+embed.iso <- isoMDS(dm, k=2)
+plot(embed.iso$points)
+```
+
+Yet another method is [Stochastic Proximity Embedding](http://www.pnas.org/content/99/25/15869.full) which uses sampling and so is applicable to very large datasets unlike the above methods. SPE is implemented in the `spe` package and we can compute a 2D embedding as follows:
+```{r}
+library(spe)
+dat <- scale(combo.clean[,-1], scale=TRUE, center=TRUE)
+embed.spe <- spe(dat, edim=2)$x
+plot(embed.spe)
+```
+
+We can perform a similar analysis but using fingerprints. `rcdk` lets compute a number of fingerprints and with the `fingerprint` package you can easily manipulate them. Lets first compute fingerprints for the MIPE and NP set separately and then create a new list containing all of them
+```{r}
+library(rcdk)
+library(fingerprint)
+mipe.fp <- lapply(mipe, function(x) get.fingerprint(x))
+np.fp <- lapply(np, function(x) get.fingerprint(x))
+
+all.fp <- append(mipe.fp, np.fp)
+```
+
+Given a list of fingerprints we can compute a Tanimoto similarity matrix and then convert that to a distance matrix ($D = 1 - \textrm(sim)$). We can then feed that to `isoMDS`
+```{r}
+fps <- fp.sim.matrix(all.fp)
+fpd <- 1-fps
+fpd[fpd == 0] <- 1e-6
+fp.iso <- isoMDS(fpd, k=2)
+plot(fp.iso$points)
+```
+
 # Comparing libraries of compounds
+
+The data we're working with consists of two sets of molecules - the MIPE collection and a set of natural product like compounds. The dimension reduction methods above have placed the compounds in a single space. Lets compare the descriptor based and fingerprint based dimension reductions on the same plot:
+```{r}
+embed.spe <- data.frame(embed.spe)
+embed.spe$Group <- combo.clean$set
+embed.spe$Space <- 'BCUT'
+
+fp.iso <- data.frame(fp.iso$points)
+fp.iso$Group <- c(rep('mipe', length(mipe.fp)),
+                  rep('np', length(np.fp)))
+fp.iso$Space <- 'Fingerprint'
+
+dat <- rbind(embed.spe, fp.iso)
+ggplot(dat, aes(x=X1, y=X2, colour=Group))+
+  geom_point()+
+  facet_wrap(~Space, scale='free')+
+  theme(legend.position=c(0.8, 0.1))
+```
+
+# Clustering a chemical space
+
+The dimension reduction of the fingerprint representation suggests that the compounds are clustered. We can compute a clustering and overlay the results on the 2D visualizations. We'll do a simple hierarchical clustering and cut it to obtain 5 clusters
+
+```{r}
+clus <- hclust(as.dist(fpd))
+plot(clus, labels=FALSE)
+
+clusids <- cutree(clus, k=5)
+fp.iso$Clusid <- clusids
+
+ggplot(fp.iso, aes(x=X1, y=X2, colour=as.factor(Clusid)))+
+  geom_point(alpha=0.5)+
+  scale_colour_brewer(palette='Set1')+
+  theme(legend.position=c(0.8, 0.1))
+```
+
+The dendrogram is pretty crowded by does suggest some clusters, but when points in the scatter plot are colored by cluster id, it doesn't appear to be so clear.
