@@ -104,6 +104,7 @@ fp.iso$Space <- 'Fingerprint'
 dat <- rbind(embed.spe, fp.iso)
 ggplot(dat, aes(x=X1, y=X2, colour=Group))+
   geom_point()+
+  scale_colour_brewer(palette='Set1')+
   facet_wrap(~Space, scale='free')+
   theme(legend.position=c(0.8, 0.1))
 ```
