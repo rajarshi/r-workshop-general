@@ -1,5 +1,7 @@
 # Good Practice in Data Analysis
 
+_This section is derived from the `tidydata` [vignette](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html)_
+
 Tidy data is a standard way of mapping the meaning of a dataset to its structure. A dataset is messy or tidy depending on how rows, columns and tables are matched up with observations, variables and types. In **tidy data**:
 
 1.  Each variable forms a column.
