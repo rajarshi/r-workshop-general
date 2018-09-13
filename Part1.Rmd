@@ -1,10 +1,11 @@
 ---
 title: "An Introduction to R"
-author: "Rajarshi Guha"
-date: "January 13, 2015"
+author: "Rajarshi Guha, Ph.D."
+date: "September 2018"
 output:
   html_document:
     toc: true
+    toc_depth: 1
     theme: readable
     number_sections: true
 ---
@@ -16,7 +17,7 @@ set.seed(12345)
 An Introduction to R
 =====================
 
-This document provides a basic introduction to the R environment focusing on the use of [RStudio](http://www.rstudio.com/) as the interface to R. We'll be working on a server that hosts RStudio so that you don't need to install anything right now. However, you're free to run RStudio on your own machine, though you will need to manually install a few packages.
+This document provides a basic introduction to the R environment focusing on the use of [RStudio](http://www.rstudio.com/) as the interface to R. 
 
 This document is based largely on two pre-existing tutorials by [Kelly Black](http://www.cyclismo.org/tutorial/R/) and [William King](http://ww2.coastal.edu/kingw/statistics/R-tutorials/)
 
@@ -181,6 +182,8 @@ A useful visualization of a tabulation is a [mosaicplot](http://en.wikipedia.org
 ```{r}
 mosaicplot(table(a,b))
 ```
+
+## Better handling of factors
 
 ## Logical
 
@@ -376,102 +379,12 @@ attributes(d)
 attr(d, "my.own.attribute") # get the value of an attribute
 ```
 
-# Reading in data
+```{r child='Part1-reading-data.Rmd'}
+```
 
-The most common method to read in data is from a CSV or tab-delimited file. The relevant functions are `read.csv` and `read.table`. Importantly, the file can be on your local hard drive or located at some URL. As an example, we'll play with a MIPE4 qHTS screen. First we read in the data and then take a look at the contents of the `data.frame`
-```{r results='hide'}
-dat <- read.csv('/ncats/prod/common/R-Workshop/mipe4-qhts.csv',
-                header=TRUE, # because the file has a header
-                as.is=TRUE, # if FALSE all character variables are converted to factors
-                comment='') # because SMILES can have '#' in them
-str(dat)
+```{r child='Part1-basic-ops.Rmd'}
 ```
-If you have tab-delimited data use the `read.table` function and specify `delim='\t'` as an extra argument.
 
-# Basic Operations
-
-We've already seen some basic arithmetic operations on vectors. In general most operations work on an element-wise basis for vectors and matrices. There are some functions that are useful for getting information about variables an d summaries of data.
-
-Given a `data.frame` or list you can get the names of columns or elements, respectively using the `names()` function
-```{r}
-names(dat)
-```
-The `summary()` method is a useful way to get a summary of numerical and factor variables. When applied to a `data.frame` or matrix you get a summary of each column.
-```{r}
-summary(dat)
-```
-Summaries of character variables are not very informative. However, in our qHTS data, we can convert some character variables to factors - curve class and target are good candidates
-```{r results='hide'}
-dat$CCLASS2 <- as.factor(dat$CCLASS2)
-dat$target <- as.factor(dat$target)
-summary(dat)
-```
-Other common operations include `mean`, `median`, `sd` (standard deviation), `min`, `max` and so on. `quantile` is a useful function to summarize distributions
-```{r}
-quantile(dat$LAC50, na.rm=TRUE)
-```
-Here the `na.rm=TRUE` argument is required since the LAC50 field contains `NA` (for the case where there was no curve fit). When `na.rm=TRUE` is specified, the function will ignore those values. Otherwise the default is `na.rm=FALSE` and the result will be NA. This argument is accepted by many functions - check the man pages.
-
-## Subsetting
-
-Given a large dataset, working on subsets is a common operation. This is especially useful when computing summaries on different subsets. Given a `data.frame` we can extract a subset of the rows using logical operations on the columns by using the `subset()` function.
-
-For example, lets consider the subset of compounds that had a curve class of -1.1:
-```{r}
-good.actives <- subset(dat, CCLASS2 == -1.1)
-nrow(good.actives)
-```
-We can use more complex subsetting rules - for example we can use a combination of curve class and efficacy (the absolute difference between `ZERO` and `INF`):
-```{r}
-efficacious.actives <- subset(dat, (CCLASS2 == -1.1 | CCLASS2 == -1.2) & abs(ZERO-INF) > 90)
-nrow(efficacious.actives)
-```
-Importantly, note the use of `|` and `&` since we're comparing vectors element-wise. A common mistake is to use `||` or `&&` which will lead to wrong results
-
-# Indexing
-
-We've already seen how to access elements of a vector, list, matrix and `data.frame`. However, there are ways to access multiple elements using index values, but also using logical values. First consider indexing using position - either using a single position or a vector of positions
-```{r collapse=TRUE}
-a <- c(1,2,3,4,5,6,7,8,9,10)
-a[1]
-a[1:3] # Elements 1, 2 and 3
-a[c(1,5,8)] # Elements 1, 5 and 8
-a[-c(1,5,8)] # Elements except 1, 5 and 8
-```
-It's also possible to use a logical vector, of the same length as the vector you're indexing. In this method, if the i'th element of the index vector is `TRUE` then the i'th element of the vector being indexed is returned
-```{r collapse=TRUE}
-idx <- c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE)
-a[idx]
-```
-Since logical operations work element-wise we can compute logical expressions and use the result to index the vector. For example, select elements that are greater than 8
-```{r}
-idx <- a > 8
-a[idx]
-```
-Or to get a little more complicated, get the elements that are greater than the mean value of the vector
-```{r}
-idx <- a > mean(a)
-a[idx]
-```
-The same principles apply to matrices and `data.frames` - except that you can specify two indices:
-```{r collapse=TRUE}
-m <- matrix(1:16, nrow=4)
-m[c(1,3), ] # rows 1 and 3 and all columns
-m[c(1,3), c(3,4)] # rows 1 and 3 and columns 3 and 4
-m[c(1,3), -c(3,4)] # rows 1 and 3 and all columns except 3 and 4
-```
-For the case of a `data.frame` we can use the same methods as above, but in addition, also use column names.
-```{r collapse=TRUE}
-dat[1:5, c(5,6,7)]
-dat[1:5, c('CCLASS2', 'LAC50', 'HILL')]
-```
-Finally, a useful function is `which` - this identifies the indices of a vector that satisfy a logical expression. The indices can then be used to extract the element of the vector.
-```{r collapse=TRUE}
-a <- 1:10
-which(a > 8)
-a[ which(a > 8) ]
-a[ a > 8 ] # Same as above
-```
 
 # Basic plotting
 
@@ -507,69 +420,71 @@ a <- rnorm(100)
 boxplot(a)
 ```
 
-However, it becomes more useful when we are interested in looking at the distribution of a variable across different categories. Using our MIPE4 dataset, lets look at the distribution of LAC50 in the "good" curve classes
+However, it becomes more useful when we are interested in looking at the distribution of a variable across different categories. Using the car dataset, lets look at the distribution of number of days parked by color of the car
 ```{r fig.width=10}
-# %in% return a vector whose i'th element is TRUE if the i'th element 
-# in CCLASS2 is present in the vector on the RHS
-good <- subset(dat, CCLASS2 %in% c(-1.1, -1.2, -2.1, -2.2)) 
-boxplot( LAC50 ~ CCLASS2, good)
+boxplot( How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked. ~ Vehicle.Color, dat.clean)
 ```
-You'll see that the plot includes x-axis positions for all curve class values - this is because we previously converted the `CCLASS2` variable to a factor. Even though we considered a subset of the `data.frame` the `CCLASS2` variable in the subset will have the same levels as in the original `data.frame` - except that only 3 of the levels will be populated. 
-
-We can get a prettier boxplot by specifying the levels of the `CCLASS2` factor
+Similarly, we can look at the distribution of number of days parked by ZIP code
 ```{r fig.width=10}
-# unique returns the unique values of a variable
-good$CCLASS2 <- factor(good$CCLASS2, levels=c("-1.1", "-1.2", "-2.1")) 
-boxplot( LAC50 ~ CCLASS2, good)
+boxplot( How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked. ~ as.factor(ZIP.Code), dat.clean)
 ```
 
-# Simple modelling
+This is a bit crowded so, lets just take the first 10 ZIP codes
+```{r fig.width=10}
+zips <- unique(dat.clean$ZIP.Code)
+zips <- zips[1:10]
+tmp <- subset(dat.clean, ZIP.Code %in% zips)
+boxplot( How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked. ~ as.factor(ZIP.Code), tmp)
+```
+```{r child='Part1-data-pipelines.Rmd'}
+```
 
-As a first look at modeling in R, we'll build a simple regression model to predict solubility. This employs a dataset of about 57K compounds (Pubchem [AID 1996](https://pubchem.ncbi.nlm.nih.gov/assay/assay.cgi?aid=1996&loc=ea_ras)) and has been described by [Guha et al](http://www.sciencedirect.com/science/article/pii/S0968089611003506). The pre-processed data can be loaded via an Rda file. In addition to the solubility values, the `data.frame` includes two classifications of the continuous solubility measurements as well as the Pubchem SID for each molecule and a set of numerical descriptors of the chemical structures. To save some time, we'll work with a random subset of the data (say 10%), rather than all 57K compounds
 
+# Integrating Other Datasets
+
+So now that we have the mean days a car remains parked by ZIP code, we'd like to know how it correlates with income in that ZIP code. First we need the year which means we need to parse dates
 ```{r}
-load('/ncats/prod/common/R-Workshop/aid1996.Rda')
-sdesc <- desc[ sample(1:nrow(desc), 0.10*nrow(desc)), ]
-nrow(sdesc)
-
-# Some summary stats
-summary(sdesc$sol)
-summary(sdesc$label)
+library(lubridate)
+result <- result %>%
+  mutate(Completion.Date = mdy(Completion.Date)) %>%
+  mutate(Completion.Year = year(Completion.Date)) %>%
+  as_tibble()
 ```
-
-As always pictures are worth many words
-
+We can get income data from the [IRS](https://www.irs.gov/statistics/soi-tax-stats-individual-income-tax-statistics-2016-zip-code-data-soi) - lets go with 2016.
 ```{r}
-hist(sdesc$sol)
-boxplot(sol ~ label, sdesc)
+income <- read.csv('https://www.irs.gov/pub/irs-soi/16zpallagi.csv',
+                   header=TRUE, as.is=TRUE) %>% as_tibble()
 ```
 
-The data is clearly bimodal, so that a single model may not be a great idea. However, for now we'll ignore the finer details and just consider the mechanics of model building. First we consider an ordinary least squares model where we try to predict the numerical solubility using a few of the calculated descriptors. As you can see from the data.frame there are 188 descriptors - which ones do we use? To answer this rigorously we would have to apply some form of [feature selection](http://en.wikipedia.org/wiki/Feature_selection). Or use a method (such as [random forest](http://en.wikipedia.org/wiki/Random_forest)) that does not require explicit feature selection.
-
-For now, we'll just select some features by hand. To build the model we use the `lm` function
+This dataset has a lot of fields - see [here](https://www.irs.gov/pub/irs-soi/16zpdoc.doc) for more information. For now, we just want ZIP code and AGI for the set of ZIP codes in our car dataset
 ```{r}
-model <- lm(sol ~ a_aro + rings + BCUT_PEOE_0, sdesc)
-summary(model)
-plot(sdesc$sol, fitted(model))
+income.il <- income %>% 
+  select(zipcode, AGI=A00100, Total.Income=A02650, Property.Tax=A18800) %>%
+  dplyr::filter(zipcode %in% result$ZIP.Code)
 ```
 
-The model summary (as well as the plot) shows very poor predictive performance. This is not surprising since the solubility values are not normally distributed at all. This can be shown using a Q-Q plot
+But we'll see that there are multiple entries per ZIP code - we want to collapse that to a single value of AGI etc per ZIP code
 ```{r}
-qqnorm(sdesc$sol)
-qqline(sdesc$sol)
+income.il <- income.il %>%
+  group_by(zipcode) %>%
+  summarize(AGI=mean(AGI), Total.Income = mean(Total.Income), 
+                Property.Tax = mean(Property.Tax))
 ```
-
-It's useful to spend some time exploring the `model` variable - it's basically a list with a number of elements that represent different aspects of the model including the coefficients, fitted values and so on. You can get a full description of these via the help page (`?lm`). But doing `names(model)` will also list the elements which you can then access using the $ notation. If you're in RStudio you can also explore the elements via the *Environment* panel. As a side note, it's good practice to access specific elements of a model using *access functions* such as `coefficients` or `residuals` rather than using `model$coeffcients` or `model$residuals`.
-
-Can we do any better if we predict solubility classes? We first try a linear approach using `lda`. As you can below, we aren't doing much better. 
-
-There are a number of reasons for the poor performance - first, we arbitrarily selected descriptors to use. This is not a good idea in general unless you have specific knowledge of the biology or chemistry. Second, this is an unbalanced classification problem - as a result, most observations are predicted to be in the majority class (`medium` solubility).
-
+Now, lets join this dataset with our car data
 ```{r}
-library(MASS)
-cmodel <- lda(label ~ a_aro + rings + BCUT_PEOE_0, sdesc)
-preds <- predict(cmodel, sdesc)$class # the model doesn't contain the predicted classes
-table(sdesc$label, preds)
-mosaicplot(table(sdesc$label, preds))
+result.income <- merge(result, income.il, by.x='ZIP.Code', by.y='zipcode')
+```
+Finally, lets see if there is any relationship between how long a car is parked and the income of the ZIP code that the call came in from
+```{r, fig.width=10}
+result.income %>%
+  ggplot(aes(AGI,Days.Parked))+geom_point(alpha=0.25)
 ```
 
+```{r child='Part1-tidy-data.Rmd'}
+```
+
+# Exercises
+
+* Using the `dat.makes` dataset, collapse the makes that contain the word 'Unknown' into a single level called `Unknown`
+
+* Using the IRS data processing example, what is the average AGI associated with each vehicle make?
