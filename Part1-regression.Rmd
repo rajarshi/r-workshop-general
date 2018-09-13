@@ -1,0 +1,60 @@
+---
+title: "Regression"
+author: "Rajarshi Guha"
+date: "9/3/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Simple modelling
+
+As a first look at modeling in R, we'll build a simple regression model to predict solubility. This employs a dataset of about 57K compounds (Pubchem [AID 1996](https://pubchem.ncbi.nlm.nih.gov/assay/assay.cgi?aid=1996&loc=ea_ras)) and has been described by [Guha et al](http://www.sciencedirect.com/science/article/pii/S0968089611003506). The pre-processed data can be loaded via an Rda file. In addition to the solubility values, the `data.frame` includes two classifications of the continuous solubility measurements as well as the Pubchem SID for each molecule and a set of numerical descriptors of the chemical structures. To save some time, we'll work with a random subset of the data (say 10%), rather than all 57K compounds
+
+```{r}
+load('/ncats/prod/common/R-Workshop/aid1996.Rda')
+sdesc <- desc[ sample(1:nrow(desc), 0.10*nrow(desc)), ]
+nrow(sdesc)
+
+# Some summary stats
+summary(sdesc$sol)
+summary(sdesc$label)
+```
+
+As always pictures are worth many words
+
+```{r}
+hist(sdesc$sol)
+boxplot(sol ~ label, sdesc)
+```
+
+The data is clearly bimodal, so that a single model may not be a great idea. However, for now we'll ignore the finer details and just consider the mechanics of model building. First we consider an ordinary least squares model where we try to predict the numerical solubility using a few of the calculated descriptors. As you can see from the data.frame there are 188 descriptors - which ones do we use? To answer this rigorously we would have to apply some form of [feature selection](http://en.wikipedia.org/wiki/Feature_selection). Or use a method (such as [random forest](http://en.wikipedia.org/wiki/Random_forest)) that does not require explicit feature selection.
+
+For now, we'll just select some features by hand. To build the model we use the `lm` function
+```{r}
+model <- lm(sol ~ a_aro + rings + BCUT_PEOE_0, sdesc)
+summary(model)
+plot(sdesc$sol, fitted(model))
+```
+
+The model summary (as well as the plot) shows very poor predictive performance. This is not surprising since the solubility values are not normally distributed at all. This can be shown using a Q-Q plot
+```{r}
+qqnorm(sdesc$sol)
+qqline(sdesc$sol)
+```
+
+It's useful to spend some time exploring the `model` variable - it's basically a list with a number of elements that represent different aspects of the model including the coefficients, fitted values and so on. You can get a full description of these via the help page (`?lm`). But doing `names(model)` will also list the elements which you can then access using the $ notation. If you're in RStudio you can also explore the elements via the *Environment* panel. As a side note, it's good practice to access specific elements of a model using *access functions* such as `coefficients` or `residuals` rather than using `model$coeffcients` or `model$residuals`.
+
+Can we do any better if we predict solubility classes? We first try a linear approach using `lda`. As you can below, we aren't doing much better. 
+
+There are a number of reasons for the poor performance - first, we arbitrarily selected descriptors to use. This is not a good idea in general unless you have specific knowledge of the biology or chemistry. Second, this is an unbalanced classification problem - as a result, most observations are predicted to be in the majority class (`medium` solubility).
+
+```{r}
+library(MASS)
+cmodel <- lda(label ~ a_aro + rings + BCUT_PEOE_0, sdesc)
+preds <- predict(cmodel, sdesc)$class # the model doesn't contain the predicted classes
+table(sdesc$label, preds)
+mosaicplot(table(sdesc$label, preds))
+```

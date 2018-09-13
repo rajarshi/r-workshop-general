@@ -1,0 +1,92 @@
+# Basic Operations
+
+We've already seen some basic arithmetic operations on vectors. In general most operations work on an element-wise basis for vectors and matrices. There are some functions that are useful for getting information about variables an d summaries of data.
+
+Given a `data.frame` or list you can get the names of columns or elements, respectively using the `names()` function
+```{r}
+names(dat)
+```
+The `summary()` method is a useful way to get a summary of numerical and factor variables. When applied to a `data.frame` or matrix you get a summary of each column.
+```{r}
+summary(dat)
+```
+Summaries of character variables are not very informative. However, in this dataset, we can convert some character variables to factors - vehicle color and model are good candidates
+```{r results='hide'}
+dat$Vehicle.Color <- as.factor(dat$Vehicle.Color)
+dat$Vehicle.Make.Model <- as.factor(dat$Vehicle.Make.Model)
+summary(dat)
+```
+Other common operations include `mean`, `median`, `sd` (standard deviation), `min`, `max` and so on. `quantile` is a useful function to summarize distributions
+```{r}
+quantile(dat$How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked., na.rm=TRUE)
+```
+When `na.rm=TRUE` is specified, the function will ignore those values. Otherwise the default is `na.rm=FALSE` and the result will be NA. This argument is accepted by many functions - check the man pages.
+
+But we immediately see a problem - do the quantiles make sense?
+
+## Subsetting
+
+Given a large dataset, working on subsets is a common operation. This is especially useful when computing summaries on different subsets. Given a `data.frame` we can extract a subset of the rows using logical operations on the columns by using the `subset()` function.
+
+For example, lets consider the subset of cars that are red:
+```{r}
+reds <- subset(dat, Vehicle.Color == 'Red')
+nrow(reds)
+```
+We can use more complex subsetting rules - for example, Subarus that are red in color
+```{r}
+a.subset <- subset(dat, Vehicle.Color == 'Red' & Vehicle.Make.Model == 'Subaru')
+nrow(a.subset)
+```
+Importantly, note the use of `&` since we're comparing vectors element-wise. A common mistake is to use `||` or `&&` which will lead to wrong results
+
+Using subsetting we can remove rows from this dataset that have absurd values of how long a vehicle has been reported as parked. We'll consider cars that have been reported to be parked for say 2 years in valid ZIP codes (`0` is not a valid ZIP code)
+
+```{r}
+dat.clean <- subset(dat, How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked. <= 2*365 & How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked. >= 0 & ZIP.Code != 0)
+```
+
+## Indexing
+
+We've already seen how to access elements of a vector, list, matrix and `data.frame`. However, there are ways to access multiple elements using index values, but also using logical values. First consider indexing using position - either using a single position or a vector of positions
+```{r collapse=TRUE}
+a <- c(1,2,3,4,5,6,7,8,9,10)
+a[1]
+a[1:3] # Elements 1, 2 and 3
+a[c(1,5,8)] # Elements 1, 5 and 8
+a[-c(1,5,8)] # Elements except 1, 5 and 8
+```
+It's also possible to use a logical vector, of the same length as the vector you're indexing. In this method, if the i'th element of the index vector is `TRUE` then the i'th element of the vector being indexed is returned
+```{r collapse=TRUE}
+idx <- c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE)
+a[idx]
+```
+Since logical operations work element-wise we can compute logical expressions and use the result to index the vector. For example, select elements that are greater than 8
+```{r}
+idx <- a > 8
+a[idx]
+```
+Or to get a little more complicated, get the elements that are greater than the mean value of the vector
+```{r}
+idx <- a > mean(a)
+a[idx]
+```
+The same principles apply to matrices and `data.frames` - except that you can specify two indices:
+```{r collapse=TRUE}
+m <- matrix(1:16, nrow=4)
+m[c(1,3), ] # rows 1 and 3 and all columns
+m[c(1,3), c(3,4)] # rows 1 and 3 and columns 3 and 4
+m[c(1,3), -c(3,4)] # rows 1 and 3 and all columns except 3 and 4
+```
+For the case of a `data.frame` we can use the same methods as above, but in addition, also use column names.
+```{r collapse=TRUE}
+dat[1:5, c(1,2,3)]
+dat[1:5, c('Vehicle.Color', 'Vehicle.Make.Model')]
+```
+Finally, a useful function is `which` - this identifies the indices of a vector that satisfy a logical expression. The indices can then be used to extract the element of the vector.
+```{r collapse=TRUE}
+a <- 1:10
+which(a > 8)
+a[ which(a > 8) ]
+a[ a > 8 ] # Same as above
+```

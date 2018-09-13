@@ -1,0 +1,13 @@
+# Reading in data
+
+The most common method to read in data is from a CSV or tab-delimited file. The relevant functions are `read.csv` and `read.table`. Importantly, the file can be on your local hard drive or located at some URL. 
+
+As an example, we'll play with a dataset describing abandoned vehicles in Chicago. First we read in the data and then take a look at the contents of the `data.frame`
+```{r results='hide'}
+dat <- read.csv('https://s3.amazonaws.com/geoda/data/Abandoned_Vehicles_Map.csv', header=TRUE, as.is=TRUE, comment='')
+str(dat)
+```
+
+If you have tab-delimited data use the `read.table` function and specify `delim='\t'` as an extra argument.
+
+But it's not just CSV and tab delimited data files that can be handled in R.Using the `readxl` package we can read in XLS data files, and using the `haven` package we can read in SPSS, Stata and SAS data files.

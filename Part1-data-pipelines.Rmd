@@ -1,0 +1,111 @@
+# Data Pipelines
+
+Uptil this point we've been using base R - all of the material can be rerun without installing extra packages. However, it can be tedious and especially if you do a lot of transformations of your data it can be difficult to follow.
+
+```{r}
+library(tidyverse)
+```
+
+The `tidyverse` set of packages is a nice way to work with data in a way that makes it easier to understand whats going on and also adhere to best practices.
+
+For example, though a `data.frame` is a base R data type, the `tibble` is a handy method to work with `data.frame`'s that offers a variety of conveniences
+```{r, echo=TRUE}
+tbl <- as_tibble(dat.clean)
+tbl
+```
+
+The `dplyr` package provides a number of functions to operate on chunks of data by filtering, splitting and combining rows of a `data.frame`. Previously we used `subset`. The corresponding function in `dplyr` is `filter`
+```{r}
+tmp <- dplyr::filter(dat.clean, Vehicle.Color == 'Red')
+head(tmp)
+```
+
+Before we go any further, we should exploit the new pipe operator that the tidyverse imports from the  `magrittr` package. This new syntax leads to code that is much easier to write and to read.
+```{r}
+dat.clean %>% head()
+```
+
+Using the pipe operator (`%>%`) we can "chain" various operations in easily understandable sequences. For example, lets take a subset of the columns, rename one of them, and filter the results, and report the number of days parked aggregated over ZIP codes
+
+The old way:
+
+```{r}
+tmp <- dat.clean[, c('Vehicle.Make.Model', 'Vehicle.Color', 'ZIP.Code',
+                     'How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked.',
+                     'Police.District', 'Community.Area')]
+names(tmp)[4] <- 'Days.Parked'
+tmp <- subset(tmp, Days.Parked < 365)
+by(tmp, tmp$ZIP.Code, function(x) mean(x$Days.Parked))
+```
+
+Using the pipe operator and `dplyr` functions we have 
+```{r}
+result <- dat.clean %>%
+  dplyr::select(Vehicle.Make.Model, Vehicle.Color, ZIP.Code,
+                Completion.Date,
+                Police.District, Community.Area, 
+                Days.Parked = How.Many.Days.Has.the.Vehicle.Been.Reported.as.Parked.) %>%
+  dplyr::filter(Days.Parked < 365)
+  
+result %>% 
+  group_by(ZIP.Code) %>%
+  summarize(mean.days = mean(Days.Parked))
+```
+
+## Handling categorical data
+
+We've already discussed categorical variables which are called factors in R, and how we can deal with them. The `tidyverse` provides the `forcats` packages which makes it a bit easier to deal with factors.
+
+```{r}
+library(forcats)
+dat.clean %>% dplyr::count(Vehicle.Make.Model)
+```
+
+We could directly create a barchart of counts for each make/model
+```{r fig.width=10}
+dat.clean %>% ggplot(aes(Vehicle.Make.Model))+geom_bar()+
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+For now lets focus on the vehicle makes that occur more than a 500 times
+```{r}
+makes <- dat.clean %>% dplyr::count(Vehicle.Make.Model) %>% dplyr::filter(n>500)
+```
+
+And then just keep those rows of our dataset where the vehicle make occurs more than 200 times:
+```{r}
+dat.makes <- dat.clean %>% dplyr::inner_join(makes, by='Vehicle.Make.Model')
+```
+Now, if we plot the frequencies of each make, we get a more reasonable figure
+```{r fig.width=10}
+dat.makes %>% ggplot(aes(Vehicle.Make.Model))+geom_bar()+
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+But it would be nice if we reordered the levels of the factor in order of increasing frequency. `fct_infreq` lets us do that for plotting
+```{r fig.width=10}
+dat.makes %>% 
+  mutate(make = Vehicle.Make.Model %>% fct_infreq()) %>%
+  ggplot(aes(make))+
+  geom_bar()+theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+After reordering factors, a useful task is to _recode_ factors. This allows us to rename a specific level or group multiple levels into a single one. If we look at the vehicle makes with more than 500 occurences we have the following list
+```{r}
+levels(dat.makes$Vehicle.Make.Model)
+```
+Lets, collapse all the `Jeep` makes into a single make called `Jeep`
+```{r}
+dat.makes <- dat.makes %>%
+  mutate(Vehicle.Make.Model = fct_recode(Vehicle.Make.Model,
+      'Jeep' = "Jeep - Year Greater 1988",
+      'Jeep' = "Jeep (If Mfd. Prior To 1970)",
+      'Jeep' = "Jeep/Cherokee"))
+```
+If we're collapsing a lot of levels, `fct_collapse` is an easier way to achieve that
+```{r}
+dat.makes <- dat.makes %>%
+  mutate(Vehicle.Make.Model = fct_collapse(Vehicle.Make.Model,
+      "Range Rover" = c("Range Rover of North America", "Range Rover Of North America"),
+      'Honda' = c("Honda", "Honda/Accord", "Honda/Civic"),
+      'Ford' = c("Ford", "Ford/Escort", "Ford/Taurus")))
+```
